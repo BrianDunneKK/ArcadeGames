@@ -26,15 +26,15 @@ class Sprite_Cave(Sprite_Shape):
         self.cave_sections = (cave_rect.width // self.cave_section_size) + 1
         self.update_reqd = False
 
-        self.setup_shape(cave_rect, [None, "green"])
-        self.cave_top = Sprite_Shape("Cave Top")
-        self.cave_bottom = Sprite_Shape("Cave Bottom")
-
-        self.cave_top.setup_shape(cave_rect, ["blue"], "Polygon")
-        self.cave_bottom.setup_shape(cave_rect, ["red3"], "Polygon")
-
+        self.setup_shape(cave_rect)
         self.walls = Sprite_ShapeSetManager("Cave Shapes", cave_rect)
+
+        self.cave_top = Sprite_Shape("Cave Top")
+        self.cave_top.setup_shape(cave_rect, ["blue"], "Polygon")
         self.walls.add_shape(self.cave_top)
+
+        self.cave_bottom = Sprite_Shape("Cave Bottom")
+        self.cave_bottom.setup_shape(cave_rect, ["red3"], "Polygon")
         self.walls.add_shape(self.cave_bottom)
 
         self.setup()
@@ -100,59 +100,84 @@ class Sprite_Cave(Sprite_Shape):
 
 ### --------------------------------------------------
 
-class Sprite_Rocket(Sprite_Animation):
+class Sprite_CaveItem(Sprite_Animation):
+    def __init__(self, name):
+        super().__init__(name)
+        self.scroll_count = 0
+        self.set_desc("Cave Item", True)
+
+    def setup(self, posx, posy, limits):
+        self.rect.right = posx
+        self.rect.bottom = posy - 1
+        ev = EventManager.gc_event("KillSpriteUUID")
+        ev.uuid = self.uuid
+        self.rect.add_limit(Physics_Limit(limits, LIMIT_KEEP_INSIDE, AT_LIMIT_XY_DO_NOTHING, ev))
+
+    def scroll(self, dx):
+        self.rect.move_physics(dx, 0)
+        self.scroll_count = self.scroll_count + 1
+
+### --------------------------------------------------
+
+class Sprite_Rocket(Sprite_CaveItem):
     def __init__(self, posx, posy, limits):
         super().__init__("Rocket")
         self.load_spritesheet("Rocket", "Images\\Rocket.png", 2, 1)
         self.set_animation("Rocket", ANIMATE_LOOP)
-        self.rect.right = posx
-        self.rect.bottom = posy - 1
-        self.scroll_count = 0
         self.launch_at = random.randint(30,100)
         self.launch_speed = -random.randint(1,5)
         self.rect.set_velocity(0, 0)
-
-        ev = EventManager.gc_event("DeleteRocket")
-        ev.uuid = self.uuid
-        self.rect.add_limit(Physics_Limit(limits, LIMIT_KEEP_INSIDE, AT_LIMIT_XY_DO_NOTHING, ev))
+        self.setup(posx, posy, limits)
         self.rect.go()
 
     def update(self):
         self.rect.move_physics()
 
     def scroll(self, dx):
-        self.rect.move_physics(dx, 0)
-        self.scroll_count = self.scroll_count + 1
+        super().scroll(dx)
         if self.scroll_count == self.launch_at:
             self.rect.set_velocity(0, self.launch_speed)
+
+### --------------------------------------------------
+
+class Sprite_FuelTank(Sprite_CaveItem):
+    def __init__(self, posx, posy, limits):
+        super().__init__("Fuel Tank")
+        self.load_spritesheet("Fuel Tank", "Images\\fuel_tank.png", 1, 1)
+        self.set_animation("Fuel Tank", ANIMATE_MANUAL)
+        self.setup(posx, posy, limits)
 
 ### --------------------------------------------------
 
 class Manager_Cave(SpriteManager):
     def __init__(self, cave_rect, spaceship_height, name = "Cave Manager"):
         super().__init__(name)
+        self._cave_rect = cave_rect
+        self.cave_background = Sprite_Shape("Cave background", cave_rect, ["green"])
+        self.add(self.cave_background)
         self.cave = Sprite_Cave(cave_rect, spaceship_height*5)
         self.add(self.cave)
         self._timer = Timer(GAME_SPEED/1000.0, EVENT_GAME_TIMER_1)
         self.rockets = SpriteGroup()
         self.rocket_launch_at = random.randint(15, 30)
         self.rocket_loop = 0
+        self.fuel_tanks = SpriteGroup()
 
     def event(self, e):
-        if e.type == EVENT_GAME_CONTROL:
-            if e.action == "ScrollCave":
-                self.cave.scroll()
-                self.move_rockets()
-                self.add_rocket()
-                EventManager.post_game_control("IncreaseScore", score=1)
-            elif e.action == "StartGame":
-                self.cave.setup()
-            elif e.action == "SpaceshipCrash":
-                self.cave.scrolling = False
-            elif e.action == "DeleteRocket":
-                self.kill_uuid(e.uuid)
-                dealt_with = True
-        return False
+        dealt_with = super().event(e)
+        if not dealt_with:
+            if e.type == EVENT_GAME_CONTROL:
+                if e.action == "ScrollCave":
+                    self.cave.scroll()
+                    self.move_cave_items()
+                    self.add_rocket()
+                    self.add_fuel_tank()
+                    EventManager.post_game_control("IncreaseScore", score=1)
+                elif e.action == "StartGame":
+                    self.cave.setup()
+                elif e.action == "SpaceshipCrash":
+                    self.cave.scrolling = False
+        return dealt_with
 
     def collision_with_cave(self, corners):
         collision = False
@@ -162,9 +187,9 @@ class Manager_Cave(SpriteManager):
                 collision = (top_bottom[0] > c[1] or top_bottom[1] < c[1])
         return collision
 
-    def move_rockets(self):
+    def move_cave_items(self):
         if self.cave.scrolling:
-            sprites = self.find_sprites_by_name("Rocket")
+            sprites = self.find_sprites_by_desc("Cave Item", True)
             for s in sprites:
                 s.scroll(-self.cave.cave_section_size)
 
@@ -178,6 +203,14 @@ class Manager_Cave(SpriteManager):
             rocket = Sprite_Rocket(posx, posy[1], self.cave.rect)
             self.add(rocket)
             self.rockets.add(rocket)
+
+    def add_fuel_tank(self):
+        if self.rocket_loop == self.rocket_launch_at-10:
+            posx = self.cave.rect.right - 10
+            posy = min(self.cave.cave_top_bottom(posx)[1] + 10, self._cave_rect.bottom - 2)
+            fuel_tank = Sprite_FuelTank(posx, posy, self._cave_rect)
+            self.add(fuel_tank)
+            self.fuel_tanks.add(fuel_tank)
 
     def update(self):
         super().update()
@@ -291,17 +324,20 @@ class Manager_Spaceship(SpriteManager):
             self._spaceship.show_explosion()
         return collide
 
-    def bullets_collide(self, dangers, dokill, score):
+    def bullets_collide(self, dangers, dokill, inc_score, inc_time):
         coll_dict = self._bullets.collide(dangers, dokilla=True, dokillb=dokill)
-        if score:
-            for bullet, rockets in coll_dict.items():
-                if len(rockets) > 0:
-                    EventManager.post_game_control("IncreaseScore", score=len(rockets)*100)
+        if inc_score:
+            for bullet, items in coll_dict.items():
+                if len(items) > 0:
+                    EventManager.post_game_control("IncreaseScore", score=len(items)*100)
+        if inc_time:
+            for bullet, items in coll_dict.items():
+                if len(items) > 0:
                     EventManager.post_game_control("IncreaseTime", increment=10)
 
     def event(self, e):
-        dealt_with = False
-        if e.type == EVENT_GAME_CONTROL:
+        dealt_with = super().event(e)
+        if not dealt_with and e.type == EVENT_GAME_CONTROL:
             dealt_with = True
             if e.action == "SpaceshipUp":
                 self._spaceship.rect.move_physics(0,-5)
@@ -366,8 +402,8 @@ class Manager_Scoreboard(SpriteManager):
         self._fps.set_text(new_fps)
 
     def event(self, e):
-        dealt_with = False
-        if e.type == EVENT_GAME_CONTROL:
+        dealt_with = super().event(e)
+        if not dealt_with and e.type == EVENT_GAME_CONTROL:
             if e.action == "IncreaseScore":
                 self.score = self.score + e.info['score']
                 dealt_with = True
@@ -383,7 +419,7 @@ class Manager_Scoreboard(SpriteManager):
 
 class ScrambleApp(PyGameApp):
     def init(self):
-        size = (1200, 700)
+        size = (1200, 800)
         super().init(size)
         pygame.display.set_caption("Scramble")
         self.background_fill = "burlywood"
@@ -414,9 +450,10 @@ class ScrambleApp(PyGameApp):
 
     def update(self):
         super().update()
-        self.spaceship_mgr.spaceship_collide(self.cave_mgr.cave.walls, self.cave_mgr.rockets)
-        self.spaceship_mgr.bullets_collide(self.cave_mgr.cave.walls, dokill=False, score=False)
-        self.spaceship_mgr.bullets_collide(self.cave_mgr.rockets, dokill=True, score=True)
+        self.spaceship_mgr.spaceship_collide(self.cave_mgr.cave.walls, self.cave_mgr.rockets, self.cave_mgr.fuel_tanks)
+        self.spaceship_mgr.bullets_collide(self.cave_mgr.cave.walls, dokill=False, inc_score=False, inc_time=False)
+        self.spaceship_mgr.bullets_collide(self.cave_mgr.rockets, dokill=True, inc_score=True, inc_time=False)
+        self.spaceship_mgr.bullets_collide(self.cave_mgr.fuel_tanks, dokill=True, inc_score=False, inc_time=True)
         self.scoreboard_mgr.set_fps(theApp.loops_per_sec)
 
 ### --------------------------------------------------

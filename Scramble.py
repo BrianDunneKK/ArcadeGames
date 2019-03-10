@@ -5,12 +5,12 @@ import pstats
 from pstats import SortKey
 
 import sys
-sys.path.append('M:/Google Drive/Projects/CoderDojo/GitHub/pygame-cdkk')
+sys.path.append("../pygame-cdkk")
 from PyGameApp import *
 
 ### --------------------------------------------------
 
-USE_PROFILING = True
+USE_PROFILING = False
 
 GAME_SPEED = 50    # msecs (lower=faster)
 EVENT_MOVE_ROCKET = EVENT_NEXT_USER_EVENT
@@ -26,7 +26,7 @@ class Sprite_Cave(Sprite_Shape):
         self.cave_sections = (cave_rect.width // self.cave_section_size) + 1
         self.update_reqd = False
 
-        self.setup_shape(cave_rect, ["green"])
+        self.setup_shape(cave_rect, [None, "green"])
         self.cave_top = Sprite_Shape("Cave Top")
         self.cave_bottom = Sprite_Shape("Cave Bottom")
 
@@ -75,8 +75,9 @@ class Sprite_Cave(Sprite_Shape):
         return poly
 
     def draw(self):
+        self.create_canvas()
         super().draw()
-        self.add_image(self.walls.draw_shapes())
+        self.walls.draw_shapes(self.image)
 
     def cave_top_bottom(self, posx, rel_screen=True):
         if rel_screen:

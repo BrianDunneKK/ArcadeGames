@@ -6,7 +6,7 @@ from pstats import SortKey
 
 import sys
 sys.path.append("../pygame-cdkk")
-from PyGameApp import *
+from cdkkPyGameApp import *
 
 ### --------------------------------------------------
 
@@ -40,15 +40,13 @@ class Sprite_Cave(Sprite_Shape):
         self.setup()
 
     def setup(self):
-        self.scrolling = True
         self.cave_top_queue = RandomQueue(self.cave_sections, 5, 500)
         self.cave_bottom_queue = RandomQueue(self.cave_sections, 5, 500)
 
     def scroll(self):
-        if self.scrolling:
-            self.cave_top_queue.append(self.cave_height - self.cave_bottom_queue.next_value - self.cave_min_gap)
-            self.cave_bottom_queue.append(self.cave_height - self.cave_top_queue.next_value - self.cave_min_gap)
-            self.update_reqd = True
+        self.cave_top_queue.append(self.cave_height - self.cave_bottom_queue.next_value - self.cave_min_gap)
+        self.cave_bottom_queue.append(self.cave_height - self.cave_top_queue.next_value - self.cave_min_gap)
+        self.update_reqd = True
 
     def update(self):
         if self.update_reqd:
@@ -162,21 +160,23 @@ class Manager_Cave(SpriteManager):
         self.rocket_launch_at = random.randint(15, 30)
         self.rocket_loop = 0
         self.fuel_tanks = SpriteGroup()
+        self._game_is_over = False
 
     def event(self, e):
         dealt_with = super().event(e)
         if not dealt_with:
             if e.type == EVENT_GAME_CONTROL:
                 if e.action == "ScrollCave":
-                    self.cave.scroll()
-                    self.move_cave_items()
-                    self.add_rocket()
-                    self.add_fuel_tank()
-                    EventManager.post_game_control("IncreaseScore", score=1)
+                    if not self._game_is_over:
+                        self.cave.scroll()
+                        self.move_cave_items()
+                        self.add_rocket()
+                        self.add_fuel_tank()
+                        EventManager.post_game_control("IncreaseScore", score=1)
+                elif e.action == "GameOver":
+                    self._game_is_over = True
                 elif e.action == "StartGame":
                     self.cave.setup()
-                elif e.action == "SpaceshipCrash":
-                    self.cave.scrolling = False
         return dealt_with
 
     def collision_with_cave(self, corners):
@@ -188,10 +188,9 @@ class Manager_Cave(SpriteManager):
         return collision
 
     def move_cave_items(self):
-        if self.cave.scrolling:
-            sprites = self.find_sprites_by_desc("Cave Item", True)
-            for s in sprites:
-                s.scroll(-self.cave.cave_section_size)
+        sprites = self.find_sprites_by_desc("Cave Item", True)
+        for s in sprites:
+            s.scroll(-self.cave.cave_section_size)
 
     def add_rocket(self):
         self.rocket_loop = self.rocket_loop + 1
@@ -301,10 +300,6 @@ class Manager_Spaceship(SpriteManager):
     def spaceship_corners(self):
         return self._spaceship.corners
 
-    @property
-    def bullets_rect(self):
-        return self._bullets.sprites_uuid_rect
-
     def fire_bullet(self, bullet_type):
         if self._bullet_timer.time_left == 0:
             posx = self.spaceship_rect.centerx + 15
@@ -321,7 +316,7 @@ class Manager_Spaceship(SpriteManager):
             if not collide:
                 collide = self._spaceship.collide(sprite_group)
         if collide:
-            self._spaceship.show_explosion()
+            EventManager.post_game_control("SpaceshipCrash")
         return collide
 
     def bullets_collide(self, dangers, dokill, inc_score, inc_time):
@@ -349,6 +344,8 @@ class Manager_Spaceship(SpriteManager):
                 self._spaceship.rect.move_physics(10,0)
             elif e.action == "SpaceshipCrash":
                 self._spaceship.show_explosion()
+                EventManager.post_game_control("GameOver")
+                dealt_with = False
             elif e.action == "FireBullet":
                 self.fire_bullet("Bullet")
             elif e.action == "FireBomb":
@@ -358,6 +355,14 @@ class Manager_Spaceship(SpriteManager):
             else:
                 dealt_with = False
         return dealt_with
+
+### --------------------------------------------------
+
+class Sprite_GameOver(Sprite_TextBox):
+    def __init__(self, rect, text="Game Over", font_size=72, font_colour="red3"):
+        super().__init__("Game Over")
+        self.setup_text(font_size, font_colour, text=text)
+        self.rect = rect.copy()
 
 ### --------------------------------------------------
 
@@ -389,6 +394,9 @@ class Manager_Scoreboard(SpriteManager):
         self._fps.rect.topleft = (limits.centerx, 10)
         self.add(self._fps)
 
+        self._game_over = Sprite_GameOver(limits, font_colour="yellow1")
+        self._game_is_over = False
+
     @property
     def score(self):
         return self._score
@@ -410,10 +418,14 @@ class Manager_Scoreboard(SpriteManager):
             elif e.action == "IncreaseTime":
                 self._timer.extend_timer(e.info["increment"])
                 dealt_with = True
+            elif e.action == "GameOver":
+                self.add(self._game_over) # Display Game Over
+                self._game_is_over = True
         return dealt_with
 
     def slow_update(self):
-        self._time_left.set_text(self._timer.time_left)
+        if not self._game_is_over:
+            self._time_left.set_text(self._timer.time_left)
 
 ### --------------------------------------------------
 

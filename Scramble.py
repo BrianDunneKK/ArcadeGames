@@ -7,6 +7,7 @@ from pstats import SortKey
 import sys
 sys.path.append("../pygame-cdkk")
 from cdkkPyGameApp import *
+from cdkkSpriteExtra import *
 
 ### --------------------------------------------------
 
@@ -358,14 +359,6 @@ class Manager_Spaceship(SpriteManager):
 
 ### --------------------------------------------------
 
-class Sprite_GameOver(Sprite_TextBox):
-    def __init__(self, rect, text="Game Over", font_size=72, font_colour="red3"):
-        super().__init__("Game Over")
-        self.setup_text(font_size, font_colour, text=text)
-        self.rect = rect.copy()
-
-### --------------------------------------------------
-
 class Manager_Scoreboard(SpriteManager):
     def __init__(self, game_time, limits, name = "Scoreboard Manager"):
         super().__init__(name)
@@ -373,25 +366,18 @@ class Manager_Scoreboard(SpriteManager):
         self._score = 0
         self._game_time = game_time
 
-        self._scoreboard = Sprite_TextBox("Score", auto_size=False)
-        self._scoreboard.setup_textbox(200, 40)
-        self._scoreboard.setup_text(36, "black", "Score: {0}")
-        self._scoreboard.rect.topleft = (70, 10)
+        self._scoreboard = Sprite_DynamicText("Score", pygame.Rect(70, 10, 200, 40), "Score: {0}")
+        self._scoreboard.set_alignment(horiz="L")
         self.add(self._scoreboard)
         self.score = 0
 
         self._timer = Timer(self._game_time, EVENT_GAME_TIMER_2)
-        self._time_left = Sprite_TextBox("Time Left", auto_size=False)
-        self._time_left.setup_textbox(200, 40)
-        self._time_left.setup_text(36, "black", "Time Left: {0:0.1f}")
+        self._time_left = Sprite_DynamicText("Time Left", pygame.Rect(limits.width - 250, 10, 200, 40), "Time Left: {0:0.1f}")
         self._time_left.set_text(0)
-        self._time_left.rect.topleft = (limits.width - 250, 10)
         self.add(self._time_left)
 
-        self._fps = Sprite_TextBox("FPS", auto_size=False)
-        self._fps.setup_textbox(150, 40)
-        self._fps.setup_text(36, "black", "FPS: {0:4.1f}")
-        self._fps.rect.topleft = (limits.centerx, 10)
+        self._fps = Sprite_DynamicText("FPS", pygame.Rect(limits.centerx-100, 10, 200, 40), "FPS: {0:4.1f}")
+        self._fps.set_alignment(horiz="L")
         self.add(self._fps)
 
         self._game_over = Sprite_GameOver(limits, font_colour="yellow1")

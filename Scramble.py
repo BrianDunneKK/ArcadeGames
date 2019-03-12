@@ -108,8 +108,7 @@ class Sprite_CaveItem(Sprite_Animation):
     def setup(self, posx, posy, limits):
         self.rect.right = posx
         self.rect.bottom = posy - 1
-        ev = EventManager.gc_event("KillSpriteUUID")
-        ev.uuid = self.uuid
+        ev = EventManager.gc_event("KillSpriteUUID", uuid=self.uuid, trace="CaveItem-Limit")
         self.rect.add_limit(Physics_Limit(limits, LIMIT_KEEP_INSIDE, AT_LIMIT_XY_DO_NOTHING, ev))
 
     def scroll(self, dx):
@@ -179,14 +178,6 @@ class Manager_Cave(SpriteManager):
                 elif e.action == "StartGame":
                     self.cave.setup()
         return dealt_with
-
-    def collision_with_cave(self, corners):
-        collision = False
-        for c in corners:
-            top_bottom = self.cave.cave_top_bottom(c[0])
-            if not collision:
-                collision = (top_bottom[0] > c[1] or top_bottom[1] < c[1])
-        return collision
 
     def move_cave_items(self):
         sprites = self.find_sprites_by_desc("Cave Item", True)
@@ -273,8 +264,7 @@ class Sprite_Bullet (Sprite_Shape):
             self.rect.set_velocity(5, 0)
             self.rect.set_acceleration(0, Physics.gravity)
 
-        ev = EventManager.gc_event("DeleteBullet")
-        ev.uuid = self.uuid
+        ev = EventManager.gc_event("KillSpriteUUID", uuid=self.uuid, trace="Bullet-Limit")
         self.rect.add_limit(Physics_Limit(limits, LIMIT_KEEP_INSIDE, AT_LIMIT_XY_DO_NOTHING, ev))
         self.rect.go()
 
@@ -292,6 +282,7 @@ class Manager_Spaceship(SpriteManager):
         self._bullets = SpriteGroup()
         self._bullet_time_limit = 250  # Minimum time between bullets (msecs)
         self._bullet_timer = Timer(self._bullet_time_limit/1000.0)
+        self._game_is_over = False
 
     @property
     def spaceship_rect(self):
@@ -333,7 +324,7 @@ class Manager_Spaceship(SpriteManager):
 
     def event(self, e):
         dealt_with = super().event(e)
-        if not dealt_with and e.type == EVENT_GAME_CONTROL:
+        if not dealt_with and e.type == EVENT_GAME_CONTROL and not self._game_is_over:
             dealt_with = True
             if e.action == "SpaceshipUp":
                 self._spaceship.rect.move_physics(0,-5)
@@ -351,8 +342,8 @@ class Manager_Spaceship(SpriteManager):
                 self.fire_bullet("Bullet")
             elif e.action == "FireBomb":
                 self.fire_bullet("Bomb")
-            elif e.action == "DeleteBullet":
-                self.kill_uuid(e.uuid)
+            elif e.action == "GameOver":
+                self._game_is_over = True
             else:
                 dealt_with = False
         return dealt_with
@@ -436,15 +427,20 @@ class ScrambleApp(PyGameApp):
         self.add_sprite_mgr(self.scoreboard_mgr)
 
         self.set_fast_keys(30)
-        self.event_mgr.keyboard_event(pygame.K_q, "Quit")
-        self.event_mgr.keyboard_event(pygame.K_r, "StartGame")
-        self.event_mgr.keyboard_event(pygame.K_UP, "SpaceshipUp")
-        self.event_mgr.keyboard_event(pygame.K_DOWN, "SpaceshipDown")
-        self.event_mgr.keyboard_event(pygame.K_LEFT, "SpaceshipLeft")
-        self.event_mgr.keyboard_event(pygame.K_RIGHT, "SpaceshipRight")
-        self.event_mgr.keyboard_event(pygame.K_a, "FireBullet")
-        self.event_mgr.keyboard_event(pygame.K_z, "FireBomb")
-        self.event_mgr.user_event(EVENT_GAME_TIMER_1, "ScrollCave")
+        key_map = {
+            pygame.K_q    : "Quit",
+            pygame.K_r    : "StartGame",
+            pygame.K_UP   : "SpaceshipUp",
+            pygame.K_DOWN : "SpaceshipDown",
+            pygame.K_LEFT : "SpaceshipLeft",
+            pygame.K_RIGHT: "SpaceshipRight",
+            pygame.K_a    : "FireBullet",
+            pygame.K_z    : "FireBomb"
+        }
+        user_event_map = {
+            EVENT_GAME_TIMER_1 : "ScrollCave"
+        }
+        self.event_mgr.event_map(key_event_map=key_map, user_event_map=user_event_map)
 
     def update(self):
         super().update()

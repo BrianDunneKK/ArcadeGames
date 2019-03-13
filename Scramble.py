@@ -1,4 +1,7 @@
 # To Do: Chanage find_collisions to use SpriteGroup.collide()
+# To Do: Move start game logic to setup()
+# To Do: Replace setup()) with start_game() ??
+# To Do: Add pygame.event.set_blocked() to limit events that are allowed on the queue. Pause all except keyboard?
 
 import cProfile
 import pstats
@@ -38,9 +41,10 @@ class Sprite_Cave(Sprite_Shape):
         self.cave_bottom.setup_shape(cave_rect, ["red3"], "Polygon")
         self.walls.add_shape(self.cave_bottom)
 
-        self.setup()
+        self.start_game()
 
-    def setup(self):
+    def start_game(self):
+        super().start_game()
         self.cave_top_queue = RandomQueue(self.cave_sections, 5, 500)
         self.cave_bottom_queue = RandomQueue(self.cave_sections, 5, 500)
 
@@ -115,6 +119,10 @@ class Sprite_CaveItem(Sprite_Animation):
         self.rect.move_physics(dx, 0)
         self.scroll_count = self.scroll_count + 1
 
+    def start_game(self):
+        super().start_game()
+        self.kill()
+
 ### --------------------------------------------------
 
 class Sprite_Rocket(Sprite_CaveItem):
@@ -160,23 +168,18 @@ class Manager_Cave(SpriteManager):
         self.rocket_launch_at = random.randint(15, 30)
         self.rocket_loop = 0
         self.fuel_tanks = SpriteGroup()
-        self._game_is_over = False
+        self.start_game()
 
     def event(self, e):
         dealt_with = super().event(e)
-        if not dealt_with:
-            if e.type == EVENT_GAME_CONTROL:
-                if e.action == "ScrollCave":
-                    if not self._game_is_over:
-                        self.cave.scroll()
-                        self.move_cave_items()
-                        self.add_rocket()
-                        self.add_fuel_tank()
-                        EventManager.post_game_control("IncreaseScore", score=1)
-                elif e.action == "GameOver":
-                    self._game_is_over = True
-                elif e.action == "StartGame":
-                    self.cave.setup()
+        if not dealt_with and e.type == EVENT_GAME_CONTROL:
+            if e.action == "ScrollCave":
+                if self.game_is_active:
+                    self.cave.scroll()
+                    self.move_cave_items()
+                    self.add_rocket()
+                    self.add_fuel_tank()
+                    EventManager.post_game_control("IncreaseScore", score=1)
         return dealt_with
 
     def move_cave_items(self):
@@ -207,11 +210,16 @@ class Manager_Cave(SpriteManager):
         super().update()
         self.rockets.collide(self.cave.walls, dokilla=True, dokillb=False)
 
+    def start_game(self):
+        self.rocket_loop = 0
+        super().start_game()
+
 ### --------------------------------------------------
 
 class Sprite_Spaceship(Sprite_Animation):
-    def __init__(self, value, limits):
-        super().__init__(str(value))
+    def __init__(self, limits):
+        super().__init__("Spaceship")
+        self._limits = limits
         self.load_animation("Spaceship", "Images\\Spaceship{0:02d}.png", 7, crop=self.crop_image)
         self.load_spritesheet("Explosion", "Images\\Explosion.png", 4, 4)
         self.show_spaceship()
@@ -251,6 +259,12 @@ class Sprite_Spaceship(Sprite_Animation):
     def show_spaceship(self):
         self.set_animation("Spaceship", ANIMATE_LOOP)
 
+    def start_game(self):
+        super().start_game()
+        self.show_spaceship()
+        self.rect.centerx = self._limits.width/4
+        self.rect.centery = self._limits.height/2
+
 ### --------------------------------------------------
 
 class Sprite_Bullet (Sprite_Shape):
@@ -277,12 +291,12 @@ class Manager_Spaceship(SpriteManager):
     def __init__(self, limits, name = "Spaceship Manager"):
         super().__init__(name)
         self._limits = limits
-        self._spaceship = Sprite_Spaceship("Spaceship", self._limits)
+        self._spaceship = Sprite_Spaceship(self._limits)
         self.add(self._spaceship, layer=9)  # Layer 9: Above everything else
         self._bullets = SpriteGroup()
         self._bullet_time_limit = 250  # Minimum time between bullets (msecs)
         self._bullet_timer = Timer(self._bullet_time_limit/1000.0)
-        self._game_is_over = False
+        self.start_game()
 
     @property
     def spaceship_rect(self):
@@ -324,28 +338,28 @@ class Manager_Spaceship(SpriteManager):
 
     def event(self, e):
         dealt_with = super().event(e)
-        if not dealt_with and e.type == EVENT_GAME_CONTROL and not self._game_is_over:
-            dealt_with = True
+        if not dealt_with and e.type == EVENT_GAME_CONTROL and self.game_is_active:
             if e.action == "SpaceshipUp":
                 self._spaceship.rect.move_physics(0,-5)
+                dealt_with = True
             elif e.action == "SpaceshipDown":
                 self._spaceship.rect.move_physics(0,5)
+                dealt_with = True
             elif e.action == "SpaceshipLeft":
                 self._spaceship.rect.move_physics(-10,0)
+                dealt_with = True
             elif e.action == "SpaceshipRight":
                 self._spaceship.rect.move_physics(10,0)
+                dealt_with = True
             elif e.action == "SpaceshipCrash":
                 self._spaceship.show_explosion()
                 EventManager.post_game_control("GameOver")
-                dealt_with = False
             elif e.action == "FireBullet":
                 self.fire_bullet("Bullet")
+                dealt_with = True
             elif e.action == "FireBomb":
                 self.fire_bullet("Bomb")
-            elif e.action == "GameOver":
-                self._game_is_over = True
-            else:
-                dealt_with = False
+                dealt_with = True
         return dealt_with
 
 ### --------------------------------------------------
@@ -353,16 +367,14 @@ class Manager_Spaceship(SpriteManager):
 class Manager_Scoreboard(SpriteManager):
     def __init__(self, game_time, limits, name = "Scoreboard Manager"):
         super().__init__(name)
-        self.count=0
         self._score = 0
         self._game_time = game_time
 
         self._scoreboard = Sprite_DynamicText("Score", pygame.Rect(70, 10, 200, 40), "Score: {0}")
         self._scoreboard.set_alignment(horiz="L")
         self.add(self._scoreboard)
-        self.score = 0
 
-        self._timer = Timer(self._game_time, EVENT_GAME_TIMER_2)
+        self._timer = None
         self._time_left = Sprite_DynamicText("Time Left", pygame.Rect(limits.width - 250, 10, 200, 40), "Time Left: {0:0.1f}")
         self._time_left.set_text(0)
         self.add(self._time_left)
@@ -372,7 +384,8 @@ class Manager_Scoreboard(SpriteManager):
         self.add(self._fps)
 
         self._game_over = Sprite_GameOver(limits, font_colour="yellow1")
-        self._game_is_over = False
+
+        self.start_game()
 
     @property
     def score(self):
@@ -395,14 +408,23 @@ class Manager_Scoreboard(SpriteManager):
             elif e.action == "IncreaseTime":
                 self._timer.extend_timer(e.info["increment"])
                 dealt_with = True
-            elif e.action == "GameOver":
-                self.add(self._game_over) # Display Game Over
-                self._game_is_over = True
         return dealt_with
 
     def slow_update(self):
-        if not self._game_is_over:
+        if self.game_is_active:
             self._time_left.set_text(self._timer.time_left)
+            
+    def start_game(self):
+        self.score = 0
+        self._timer = Timer(self._game_time, EVENT_GAME_TIMER_2, auto_start=True)
+        self.remove(self._game_over)
+        super().start_game()
+
+    def end_game(self):
+        super().end_game()
+        self.add(self._game_over)
+        if self._timer.time_left < 0.25:
+            self._time_left.set_text(0)
 
 ### --------------------------------------------------
 
@@ -419,7 +441,7 @@ class ScrambleApp(PyGameApp):
 
         self.spaceship_mgr = Manager_Spaceship(cave_rect)
         self.cave_mgr = Manager_Cave(cave_rect, self.spaceship_mgr.spaceship_rect.height)
-        self.scoreboard_mgr = Manager_Scoreboard(15, self.boundary)
+        self.scoreboard_mgr = Manager_Scoreboard(10, self.boundary)
 
         # Sequence: Bottom to top layer
         self.add_sprite_mgr(self.cave_mgr)
@@ -438,7 +460,8 @@ class ScrambleApp(PyGameApp):
             pygame.K_z    : "FireBomb"
         }
         user_event_map = {
-            EVENT_GAME_TIMER_1 : "ScrollCave"
+            EVENT_GAME_TIMER_1 : "ScrollCave",
+            EVENT_GAME_TIMER_2 : "GameOver"
         }
         self.event_mgr.event_map(key_event_map=key_map, user_event_map=user_event_map)
 
@@ -469,4 +492,3 @@ else:
 
     # print("Sort by call count:")
     # p.strip_dirs().sort_stats(SortKey.CALLS).print_stats(20)
-

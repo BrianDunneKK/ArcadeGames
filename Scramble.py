@@ -1,8 +1,3 @@
-# To Do: Chanage find_collisions to use SpriteGroup.collide()
-# To Do: Move start game logic to setup()
-# To Do: Replace setup()) with start_game() ??
-# To Do: Add pygame.event.set_blocked() to limit events that are allowed on the queue. Pause all except keyboard?
-
 import cProfile
 import pstats
 from pstats import SortKey
@@ -435,8 +430,7 @@ class ScrambleApp(PyGameApp):
         pygame.display.set_caption("Scramble")
         self.background_fill = "burlywood"
 
-        cave_rect = self.boundary
-        cave_rect = cave_rect.inflate(-100, -100)
+        cave_rect = self.boundary.inflate(-100, -100)
         cave_rect.topleft = (50, 50)
 
         self.spaceship_mgr = Manager_Spaceship(cave_rect)

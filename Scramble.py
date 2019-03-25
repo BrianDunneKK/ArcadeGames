@@ -18,22 +18,21 @@ EVENT_MOVE_ROCKET = EVENT_NEXT_USER_EVENT
 
 class Sprite_Cave(Sprite_Shape):
     def __init__(self, cave_rect, min_gap, section_size=10):
-        super().__init__("Cave")
+        super().__init__("Cave", cave_rect, Sprite_Shape.invisible_style)
         self.cave_height = cave_rect.height
         self.cave_min_gap = min_gap
         self.cave_section_size = section_size
         self.cave_sections = (cave_rect.width // self.cave_section_size) + 1
         self.update_reqd = False
 
-        self.setup_shape(cave_rect)
         self.walls = Sprite_ShapeSetManager("Cave Shapes", cave_rect)
 
-        self.cave_top = Sprite_Shape("Cave Top")
-        self.cave_top.setup_shape(cave_rect, ["blue"], "Polygon")
+        top_style = {"fillcolour":"blue", "outlinecolour":None, "shape":"Polygon"}
+        self.cave_top = Sprite_Shape("Cave Top", cave_rect, top_style)
         self.walls.add_shape(self.cave_top)
 
-        self.cave_bottom = Sprite_Shape("Cave Bottom")
-        self.cave_bottom.setup_shape(cave_rect, ["red3"], "Polygon")
+        bottom_style = {"fillcolour":"red3", "outlinecolour":None, "shape":"Polygon"}
+        self.cave_bottom = Sprite_Shape("Cave Bottom", cave_rect, bottom_style)
         self.walls.add_shape(self.cave_bottom)
 
         self.start_game()
@@ -49,6 +48,7 @@ class Sprite_Cave(Sprite_Shape):
         self.update_reqd = True
 
     def update(self):
+        super().update()
         if self.update_reqd:
             poly = self._queue_to_polygon(self.cave_top_queue.queue, 0)
             self.cave_top.setup_polygon(poly)
@@ -132,6 +132,7 @@ class Sprite_Rocket(Sprite_CaveItem):
         self.rect.go()
 
     def update(self):
+        super().update()
         self.rect.move_physics()
 
     def scroll(self, dx):
@@ -154,7 +155,7 @@ class Manager_Cave(SpriteManager):
     def __init__(self, cave_rect, spaceship_height, name = "Cave Manager"):
         super().__init__(name)
         self._cave_rect = cave_rect
-        self.cave_background = Sprite_Shape("Cave background", cave_rect, ["green"])
+        self.cave_background = Sprite_Shape("Cave background", cave_rect, style={"fillcolour":"green", "outlinecolour":None})
         self.add(self.cave_background)
         self.cave = Sprite_Cave(cave_rect, spaceship_height*5)
         self.add(self.cave)
@@ -223,7 +224,7 @@ class Sprite_Spaceship(Sprite_Animation):
         self.rect.add_limit(Physics_Limit(limits, LIMIT_KEEP_INSIDE, AT_LIMIT_X_HOLD_POS_X+AT_LIMIT_Y_HOLD_POS_Y))
 
         return_speed = 3
-        limit_rect = pygame.Rect(0,0,return_speed*2,0)
+        limit_rect = cdkkRect(0,0,return_speed*2,0)
         limit_rect.center = self.rect.center
         xlimit = Physics_Limit(limit_rect, LIMIT_MOVE_TO, AT_LIMIT_X_MOVE_TO_X)
         xlimit.motion = Physics_Motion()
@@ -246,6 +247,7 @@ class Sprite_Spaceship(Sprite_Animation):
         return corners
 
     def update(self):
+        super().update()
         self.rect.move_physics()
 
     def show_explosion(self):
@@ -262,22 +264,28 @@ class Sprite_Spaceship(Sprite_Animation):
 
 ### --------------------------------------------------
 
-class Sprite_Bullet (Sprite_Shape):
+class Sprite_Ammunition (Sprite_Shape):
+    ammunition_style = {"fillcolour":"orange", "outlinecolour":None}
+    bullet_style = merge_dicts(ammunition_style, {"width":20, "height":3, "shape":"Rectangle"})
+    bomb_style = merge_dicts(ammunition_style, {"width":10, "height":10, "shape":"Ellipse"})
+
     def __init__(self, bullet_type, posx, posy, limits):
         super().__init__(bullet_type)
         if bullet_type == "Bullet":
-            self.setup_shape(pygame.Rect(posx,posy,20,3), ["orange"])
+            self.update_style(Sprite_Ammunition.bullet_style)
             self.rect.set_velocity(20, 0)
         elif bullet_type == "Bomb":
-            self.setup_shape(pygame.Rect(posx,posy,10,10), ["orange"], "Ellipse")
+            self.update_style(Sprite_Ammunition.bomb_style)
             self.rect.set_velocity(5, 0)
             self.rect.set_acceleration(0, Physics.gravity)
+        self.rect.topleft = (posx, posy)
 
         ev = EventManager.gc_event("KillSpriteUUID", uuid=self.uuid, trace="Bullet-Limit")
         self.rect.add_limit(Physics_Limit(limits, LIMIT_KEEP_INSIDE, AT_LIMIT_XY_DO_NOTHING, ev))
         self.rect.go()
 
     def update(self):
+        super().update()
         self.rect.move_physics()
 
 ### --------------------------------------------------
@@ -305,11 +313,12 @@ class Manager_Spaceship(SpriteManager):
         if self._bullet_timer.time_left == 0:
             posx = self.spaceship_rect.centerx + 15
             posy = self.spaceship_rect.centery - 5
-            bullet = Sprite_Bullet(bullet_type, posx, posy, self._limits)
+            bullet = Sprite_Ammunition(bullet_type, posx, posy, self._limits)
             self.add(bullet, layer=1)
             self._bullets.add(bullet)
             EventManager.post_game_control("IncreaseScore", score=-1)
             self._bullet_timer = Timer(self._bullet_time_limit/1000.0)
+            print("Bullet")
 
     def spaceship_collide(self, *dangers):
         collide = False
@@ -365,20 +374,21 @@ class Manager_Scoreboard(SpriteManager):
         self._score = 0
         self._game_time = game_time
 
-        self._scoreboard = Sprite_DynamicText("Score", pygame.Rect(70, 10, 200, 40), "Score: {0}")
-        self._scoreboard.set_alignment(horiz="L")
+        score_style = {"fillcolour":None, "align_horiz":"L"}
+        self._scoreboard = Sprite_DynamicText("Score", cdkkRect(70, 10, 200, 40), score_style)
+        self._scoreboard.set_text_format("Score: {0}", 0)
         self.add(self._scoreboard)
 
         self._timer = None
-        self._time_left = Sprite_DynamicText("Time Left", pygame.Rect(limits.width - 250, 10, 200, 40), "Time Left: {0:0.1f}")
-        self._time_left.set_text(0)
+        self._time_left = Sprite_DynamicText("Time Left", cdkkRect(limits.width - 250, 10, 200, 40), score_style)
+        self._time_left.set_text_format("Time Left: {0:0.1f}", 0)
         self.add(self._time_left)
 
-        self._fps = Sprite_DynamicText("FPS", pygame.Rect(limits.centerx-100, 10, 200, 40), "FPS: {0:4.1f}")
-        self._fps.set_alignment(horiz="L")
+        self._fps = Sprite_DynamicText("FPS", cdkkRect(limits.centerx-100, 10, 200, 40), score_style)
+        self._fps.set_text_format("FPS: {0:4.1f}", 0)
         self.add(self._fps)
 
-        self._game_over = Sprite_GameOver(limits, font_colour="yellow1")
+        self._game_over = Sprite_GameOver(limits)
 
         self.start_game()
 

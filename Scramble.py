@@ -159,7 +159,6 @@ class Manager_Cave(SpriteManager):
         self.add(self.cave_background)
         self.cave = Sprite_Cave(cave_rect, spaceship_height*5)
         self.add(self.cave)
-        self._timer = Timer(GAME_SPEED/1000.0, EVENT_GAME_TIMER_1)
         self.rockets = SpriteGroup()
         self.rocket_launch_at = random.randint(15, 30)
         self.rocket_loop = 0
@@ -169,7 +168,7 @@ class Manager_Cave(SpriteManager):
     def event(self, e):
         dealt_with = super().event(e)
         if not dealt_with and e.type == EVENT_GAME_CONTROL:
-            if e.action == "ScrollCave":
+            if e.action == "ScrollGame":
                 if self.game_is_active:
                     self.cave.scroll()
                     self.move_cave_items()
@@ -318,7 +317,6 @@ class Manager_Spaceship(SpriteManager):
             self._bullets.add(bullet)
             EventManager.post_game_control("IncreaseScore", score=-1)
             self._bullet_timer = Timer(self._bullet_time_limit/1000.0)
-            print("Bullet")
 
     def spaceship_collide(self, *dangers):
         collide = False
@@ -421,7 +419,7 @@ class Manager_Scoreboard(SpriteManager):
             
     def start_game(self):
         self.score = 0
-        self._timer = Timer(self._game_time, EVENT_GAME_TIMER_2, auto_start=True)
+        self._timer = Timer(self._game_time, EVENT_GAME_TIMER_1, auto_start=True)
         self.remove(self._game_over)
         super().start_game()
 
@@ -435,10 +433,7 @@ class Manager_Scoreboard(SpriteManager):
 
 class ScrambleApp(PyGameApp):
     def init(self):
-        size = (1200, 800)
-        super().init(size)
-        pygame.display.set_caption("Scramble")
-        self.background_fill = "burlywood"
+        super().init()
 
         cave_rect = self.boundary.inflate(-100, -100)
         cave_rect.topleft = (50, 50)
@@ -452,7 +447,6 @@ class ScrambleApp(PyGameApp):
         self.add_sprite_mgr(self.spaceship_mgr)
         self.add_sprite_mgr(self.scoreboard_mgr)
 
-        self.set_fast_keys(30)
         key_map = {
             pygame.K_q    : "Quit",
             pygame.K_r    : "StartGame",
@@ -464,8 +458,7 @@ class ScrambleApp(PyGameApp):
             pygame.K_z    : "FireBomb"
         }
         user_event_map = {
-            EVENT_GAME_TIMER_1 : "ScrollCave",
-            EVENT_GAME_TIMER_2 : "GameOver"
+            EVENT_GAME_TIMER_1 : "GameOver"
         }
         self.event_mgr.event_map(key_event_map=key_map, user_event_map=user_event_map)
 
@@ -479,7 +472,14 @@ class ScrambleApp(PyGameApp):
 
 ### --------------------------------------------------
 
-theApp = ScrambleApp()
+app_config = {
+    "width":1200, "height":800,
+    "background_fill":"burlywood",
+    "caption":"Scramble",
+    "key_repeat_time":30,   # msecs (lower=faster)
+    "scroll_time":50        # msecs (lower=faster)
+    }
+theApp = ScrambleApp(app_config)
 
 if not USE_PROFILING:
     theApp.execute()

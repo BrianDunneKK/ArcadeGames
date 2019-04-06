@@ -1,3 +1,5 @@
+# To Do: Becasue of fastkeys, StartGame being sent multiple times
+
 import cProfile
 import pstats
 from pstats import SortKey
@@ -34,8 +36,6 @@ class Sprite_Cave(Sprite_Shape):
         bottom_style = {"fillcolour":"red3", "outlinecolour":None, "shape":"Polygon"}
         self.cave_bottom = Sprite_Shape("Cave Bottom", cave_rect, bottom_style)
         self.walls.add_shape(self.cave_bottom)
-
-        self.start_game()
 
     def start_game(self):
         super().start_game()
@@ -163,7 +163,6 @@ class Manager_Cave(SpriteManager):
         self.rocket_launch_at = random.randint(15, 30)
         self.rocket_loop = 0
         self.fuel_tanks = SpriteGroup()
-        self.start_game()
 
     def event(self, e):
         dealt_with = super().event(e)
@@ -206,8 +205,8 @@ class Manager_Cave(SpriteManager):
         self.rockets.collide(self.cave.walls, dokilla=True, dokillb=False)
 
     def start_game(self):
-        self.rocket_loop = 0
         super().start_game()
+        self.rocket_loop = 0
 
 ### --------------------------------------------------
 
@@ -298,7 +297,6 @@ class Manager_Spaceship(SpriteManager):
         self._bullets = SpriteGroup()
         self._bullet_time_limit = 250  # Minimum time between bullets (msecs)
         self._bullet_timer = Timer(self._bullet_time_limit/1000.0)
-        self.start_game()
 
     @property
     def spaceship_rect(self):
@@ -388,8 +386,6 @@ class Manager_Scoreboard(SpriteManager):
 
         self._game_over = Sprite_GameOver(limits)
 
-        self.start_game()
-
     @property
     def score(self):
         return self._score
@@ -418,16 +414,16 @@ class Manager_Scoreboard(SpriteManager):
             self._time_left.set_text(self._timer.time_left)
             
     def start_game(self):
+        super().start_game()
         self.score = 0
         self._timer = Timer(self._game_time, EVENT_GAME_TIMER_1, auto_start=True)
         self.remove(self._game_over)
-        super().start_game()
 
     def end_game(self):
-        super().end_game()
         self.add(self._game_over)
         if self._timer.time_left < 0.25:
             self._time_left.set_text(0)
+        super().end_game()
 
 ### --------------------------------------------------
 

@@ -258,7 +258,7 @@ class Manager_Scoreboard(SpriteManager):
         self.remove(self._game_over)
 
     def end_game(self):
-        if self._timer.time_up:
+        if self._timer.time_up(False):
             self._game_over.text = "You Lost"
         else:
             self._game_over.text = "You Won!!"

@@ -7,23 +7,27 @@ from cdkkSpriteExtra import *
 
 ### --------------------------------------------------
 
-class Sprite_PacMan(Sprite_Animation):
-    def __init__(self, posx, posy, speed, cell0):
-        super().__init__("PacMan")
-        self.load_spritesheet("PacManR", "Images\\PacMan.png", 16, 4, start=0,  end=16)
-        self.load_spritesheet("PacManL", "Images\\PacMan.png", 16, 4, start=16, end=32)
-        self.load_spritesheet("PacManD", "Images\\PacMan.png", 16, 4, start=32, end=48)
-        self.load_spritesheet("PacManU", "Images\\PacMan.png", 16, 4, start=48, end=64)
-        self.rect.center = (posx, posy)
-        self._posx = self._posy = [None, None]
+class Sprite_GridActor(Sprite_Animation):
+    def __init__(self, name, start_cell, speed, cell0):
+        super().__init__(name)
+        self._cell_pos = [None, None, None, None]
         self.direction = "R"
         self._speed = speed
         self._cell0 = cell0
-        self._timer = Timer(0.02)
+        self.move_to(start_cell)
 
     @property
     def centre(self):
         return self.rect.center
+
+    @property
+    def cell_pos(self):
+        # cell_x, cell_y, cell_px, cell_py
+        return self._cell_pos
+
+    @cell_pos.setter
+    def cell_pos(self, new_cell_pos):
+        self._cell_pos = new_cell_pos
 
     @property
     def direction(self):
@@ -33,59 +37,80 @@ class Sprite_PacMan(Sprite_Animation):
     def direction(self, new_direction):
         if new_direction in ["U", "D", "L", "R"]:
             self._direction = new_direction
-            self.set_animation("PacMan" + new_direction, ANIMATE_SHUTTLE, 2)
+            self.set_animation(self.name + new_direction, ANIMATE_SHUTTLE, 2)
             self._draw_reqd = True
 
-    def move(self, x, y, px, py, dir, barrier):
-        dir_ok = False
-
-        # Set current position (cell x & y) and percentage within cell
-        self._posx = [x, px]
-        self._posy = [y, py]
-
+    def _convert_dir(self, dir):
+        # Convert dir string to dx, dy
         if   dir == "R": dx, dy = 1, 0
         elif dir == "L": dx, dy = -1, 0
         elif dir == "D": dx, dy = 0, 1
         elif dir == "U": dx, dy = 0, -1
         else: dx, dy = 0, 0
+        return (dx, dy)
+
+    def _can_move(self, barriers):
+        x = self._cell_pos[0]
+        y = self._cell_pos[1]
+        px = self._cell_pos[2]
+        py = self._cell_pos[3]
+
+        dir_ok = { "R":True, "L":True, "D":True, "U":True }
 
         # Check if barrier is too close
-        dir_ok = True
-
-        if dx ==  1 and px >= 50: dir_ok = ((x+dx) < barrier)
-        if dx == -1 and px <= 50: dir_ok = ((x+dx) > barrier)
-        if dy ==  1 and py >= 50: dir_ok = ((y+dy) < barrier)
-        if dy == -1 and py <= 50: dir_ok = ((y+dy) > barrier)
-
-        # Check if lined up with grid
-        if dx != 0: dir_ok = dir_ok and (py>35 and py<65)
-        if dy != 0: dir_ok = dir_ok and (px>35 and px<65)
-
-        dx, dy = dx * self._speed, dy * self._speed
-
-        if dir_ok and dx != 0: dy = ((50 - py) / 100.0 ) * self._cell0.height
-        if dir_ok and dy != 0: dx = ((50 - px) / 100.0 ) * self._cell0.width
-
-        if dir_ok:
-            self.direction = dir
-            if self._timer.time_up():
-                self.rect.move_physics(dx, dy)
+        if px >= 50: dir_ok["R"] = ((x+1) < barriers["R"]) and (py>35 and py<65)
+        if px <= 50: dir_ok["L"] = ((x-1) > barriers["L"]) and (py>35 and py<65)
+        if py >= 50: dir_ok["D"] = ((y+1) < barriers["D"]) and (px>35 and px<65)
+        if py <= 50: dir_ok["U"] = ((y-1) > barriers["U"]) and (px>35 and px<65)
 
         return dir_ok
 
-    def start_game(self):
-        super().start_game()
-        # Start goes here
+    def move(self, dir, barriers):
+        if dir not in ["R", "L", "D", "U"]:
+            return
 
-    def end_game(self):
-        # End goes here
-        super().end_game()
+        dir_ok = self._can_move(barriers)
 
-    def update(self):
-        super().update()
+        dx = dy = 0
+        if dir == "R" and dir_ok["R"]: dx = self._speed
+        if dir == "L" and dir_ok["L"]: dx = -self._speed
+        if dir == "D" and dir_ok["D"]: dy = self._speed
+        if dir == "U" and dir_ok["U"]: dy = -self._speed
 
-    def draw(self):
-        super().draw()
+        if dir_ok[dir]:
+            if dx != 0: dy = ((50 - self._cell_pos[3]) / 100.0 ) * self._cell0.height
+            if dy != 0: dx = ((50 - self._cell_pos[2]) / 100.0 ) * self._cell0.width
+            self.direction = dir
+            self.move_by(dx, dy)
+
+        return dir_ok[dir]
+
+    def move_by(self, dx, dy):
+        self.rect.move_physics(dx, dy)
+
+    def move_to(self, col_row, new_dir=None):
+        col, row = col_row
+        self.rect.centerx = self._cell0.left + (col + 0.5) * self._cell0.width
+        self.rect.centery = self._cell0.top + (row + 0.5) * self._cell0.height
+        self._cell_pos = [col, row, 50, 50]
+        if new_dir is not None:
+            self.direction = new_dir
+
+### --------------------------------------------------
+
+class Sprite_PacMan(Sprite_GridActor):
+    def __init__(self, start_cell, speed, cell0):
+        super().__init__("PacMan", start_cell, speed, cell0)
+        self.load_spritesheet("PacManR", "Images\\PacMan.png", 16, 4, start=0,  end=16)
+        self.load_spritesheet("PacManL", "Images\\PacMan.png", 16, 4, start=16, end=32)
+        self.load_spritesheet("PacManD", "Images\\PacMan.png", 16, 4, start=32, end=48)
+        self.load_spritesheet("PacManU", "Images\\PacMan.png", 16, 4, start=48, end=64)
+        self.move_to(start_cell, "R")
+        self._timer = Timer(0.02)
+
+    def move_by(self, dx, dy):
+        if self._timer.time_up():
+            super().move_by(dx, dy)
 
 ### --------------------------------------------------
 
@@ -122,8 +147,10 @@ class PacMaze(StringLOL):
 
 ### --------------------------------------------------
 
+PACMAN_SPEED = 5
+
 class PacManager(SpriteManager):
-    def __init__(self, pacmaze, limits, grid_size, pac_start):
+    def __init__(self, pacmaze, limits, grid_size, pac_start, maze_events):
         super().__init__("Pac-Manager")
         self.limits = limits
 
@@ -131,6 +158,7 @@ class PacManager(SpriteManager):
         self._maze_sprites = pacmaze.mapped("image")
         self._maze_barriers = pacmaze.mapped("barrier")
         self._maze_pacdots = pacmaze.mapped("pacdot")
+        self._maze_events = maze_events
 
         self._grid = Sprite_Grid()
         xsize, ysize = grid_size
@@ -149,23 +177,20 @@ class PacManager(SpriteManager):
                 else:
                     self._maze_pacdots[pacdotID] = None
 
-        pac_start_x, pac_start_y = pac_start
-        posx = self._grid.rect.left + (pac_start_x + 0.5)*xsize
-        posy = self._grid.rect.top + (pac_start_y + 0.5)*ysize
-        self._pacman = Sprite_PacMan(posx, posy, 5, self._grid.cell_rect(0,0))
+        self._pacman = Sprite_PacMan(pac_start, PACMAN_SPEED, self._grid.cell_rect(0,0))
         self._pacman_curr_dir = self._pacman_next_dir = ""
         self.update_pacman()
 
     def event(self, e):
         dealt_with = super().event(e)
-        new_direction = None
         if not dealt_with and e.type == EVENT_GAME_CONTROL and self.game_is_active:
-            if e.action in ["PacManUp", "PacManDown", "PacManLeft", "PacManRight"]:
-                new_direction = e.action[6:7]  # U, D, L or R
-        if new_direction is not None:
-            dealt_with = True
-            self._pacman_next_dir = new_direction
-            self.update_pacman()
+            if e.action == "PacManJump":
+                self._pacman.move_to(e.info["toCell"])
+                dealt_with = True
+            elif e.action in ["PacManUp", "PacManDown", "PacManLeft", "PacManRight"]:
+                self._pacman_next_dir = e.action[6:7]  # U, D, L or R
+                self.update_pacman()
+                dealt_with = True
         return dealt_with
 
     def add_pacman(self):
@@ -173,14 +198,14 @@ class PacManager(SpriteManager):
 
     def update_pacman(self):
         x, y = self._pacman.centre
-        cellp = self._grid.find_cellp(x,y)
-        barrier = self._grid.find_barrier(cellp[0], cellp[1], self._pacman_next_dir)
-        dir_ok = self._pacman.move(cellp[0], cellp[1], cellp[2], cellp[3], self._pacman_next_dir, barrier)
+        self._pacman.cell_pos = self._grid.find_cellp(x,y)
+        barriers = self._grid.find_barriers(self._pacman.cell_pos[0], self._pacman.cell_pos[1], self._pacman_next_dir)
+        dir_ok = self._pacman.move(self._pacman_next_dir, barriers)
         if dir_ok:
             self._pacman_curr_dir = self._pacman_next_dir
         else:
-            barrier = self._grid.find_barrier(cellp[0], cellp[1], self._pacman_curr_dir)
-            self._pacman.move(cellp[0], cellp[1], cellp[2], cellp[3], self._pacman_curr_dir, barrier)
+            barriers = self._grid.find_barriers(self._pacman.cell_pos[0], self._pacman.cell_pos[1], self._pacman_curr_dir)
+            self._pacman.move(self._pacman_curr_dir, barriers)
 
         x, y = self._pacman.centre
         cellp = self._grid.find_cellp(x,y)
@@ -194,6 +219,11 @@ class PacManager(SpriteManager):
             ev = EventManager.create_event(EVENT_GAME_TIMER_1)
             EventManager.post(ev)
 
+        cellc = self._grid.find_cell_centre(x, y)
+        for e in self._maze_events:
+            if cellc == e.info["fromCell"] and self._pacman_curr_dir == e.info["dir"]:
+                EventManager.post(e)
+
         return dir_ok
 
     def update(self):
@@ -203,13 +233,6 @@ class PacManager(SpriteManager):
     def start_game(self):
         super().start_game()
         self.add_pacman()
-        # This is called each time a game starts
-        # Typically this is where sprites are created/reset
-
-    def end_game(self):
-        # This is called each time a game ends
-        # Typically this is where sprites are removed
-        super().end_game()
 
 ### --------------------------------------------------
 
@@ -248,7 +271,6 @@ class Manager_Scoreboard(SpriteManager):
         self._fps.set_text(new_fps)
 
     def slow_update(self):
-        # This is called around 3 times per sec and is for updates that don't need to happen every game loop
         if self.game_is_active:
             self._time_left.set_text(self._timer.time_left)
             
@@ -258,7 +280,7 @@ class Manager_Scoreboard(SpriteManager):
         self.remove(self._game_over)
 
     def end_game(self):
-        if self._timer.time_up:
+        if self._timer.time_up():
             self._game_over.text = "You Lost"
         else:
             self._game_over.text = "You Won!!"
@@ -291,19 +313,38 @@ mazeLevel1 = """
 █████│●││●●●●●
 █████│●││●┌───
 ─────┘●└┘●│███
-1●●●●●●●●●│███
+●●●●●●●●●●│███
 """
 mazeLevel1_size = (32, 32)
 mazeLevel1_start = (13, 23)
+mazeLevel1_events = [
+    EventManager.gc_event("PacManJump", fromCell=(0,14), toCell=(27,14), dir="L"),
+    EventManager.gc_event("PacManJump", fromCell=(27,14), toCell=(0,14), dir="R")
+]
+
+# mazeLevel2 = """
+# XXXXXXXXXXXXX
+# X...X...X...X
+# X.X...X...X..
+# X...X...X...X
+# XX.XXX.XXX.XX
+# X...X...X...X
+# X.X...X...X..
+# X...X...X...X
+# XX.XXX.XXX.XX
+# """
+# mazeLevel2_size = (32, 32)
+# mazeLevel2_start = (1, 1)
+
 
 class MyGame(PyGameApp):
     def init(self):
         super().init()
 
         mirrorMap = {"┌":"└┐", "┐":"┘┌", "└":"┌┘", "┘":"┐└", "├":"├┤", "┤":"┤├", "┬":"┴┬", "┴":"┬┴" }
-        imageMap = { "─":1, "│":2, "┌":3, "┐":4, "└":5, "┘":6, "├":7, "┤":8, "┬":9, "┴":10, "┼":11, "●":0, "█":0, "1":0 }
-        barrierMap = { "─":True, "│":True, "┌":True, "┐":True, "└":True, "┘":True, "├":True, "┤":True, "┬":True, "┴":True, "┼":True, "●":False, "█":False, "1":False }
-        pacdotMap = { "●":True }
+        imageMap = { "─":1, "│":2, "┌":3, "┐":4, "└":5, "┘":6, "├":7, "┤":8, "┬":9, "┴":10, "┼":11, "●":0, "█":0, "X":15, ".":0 }
+        barrierMap = { "─":True, "│":True, "┌":True, "┐":True, "└":True, "┘":True, "├":True, "┤":True, "┬":True, "┴":True, "┼":True, "●":False, "█":False, "X":True, ".":False }
+        pacdotMap = { "●":True, ".":True }
 
         level1 = PacMaze(mazeLevel1, mirrorMap, True, True, True, False)
         level1.update_maze(mazeLevel1_start, "█")
@@ -311,8 +352,8 @@ class MyGame(PyGameApp):
         level1.map_maze("barrier", barrierMap)
         level1.map_maze("pacdot", pacdotMap, False)
         
-        self.pacmanager = PacManager(level1, self.boundary, mazeLevel1_size, mazeLevel1_start)
-        self.scoreboard_mgr = Manager_Scoreboard(100, self.boundary)
+        self.pacmanager = PacManager(level1, self.boundary, mazeLevel1_size, mazeLevel1_start, mazeLevel1_events)
+        self.scoreboard_mgr = Manager_Scoreboard(90, self.boundary)
 
         self.add_sprite_mgr(self.pacmanager)
         self.add_sprite_mgr(self.scoreboard_mgr)
@@ -333,7 +374,6 @@ class MyGame(PyGameApp):
     def update(self):
         super().update()
         self.scoreboard_mgr.set_fps(theApp.loops_per_sec)
-        # Manage interaction between Sprites in different SpriteManagers
 
 ### --------------------------------------------------
 

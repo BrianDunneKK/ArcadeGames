@@ -93,7 +93,7 @@ class PacManager(SpriteManager):
 
         self._grid = Sprite_ImageGrid()
         xsize, ysize = pacman_level.size
-        self._grid.setup_grid(["Images\\PacManGrid.png",4,4], self._maze_sprites, self._maze_barriers, xsize, self._maze.cols, ysize, self._maze.rows)
+        self._grid.setup_image_grid(["Images\\PacManGrid.png",4,4], self._maze_sprites, self._maze_barriers, xsize, self._maze.cols, ysize, self._maze.rows)
         self._grid.rect.center = self.limits.center
         self.add(self._grid)
 

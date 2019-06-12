@@ -1,3 +1,4 @@
+# To Do: Chnage PacMaze to GirdMap an move to cdkkUtils
 # To Do: Make dots_left more efficient - returns list; count required
 # To Do: Create PacManLevel.add_event()
 
@@ -24,9 +25,11 @@ class Sprite_PacMan(Sprite_ImageGridActor):
 
 ### --------------------------------------------------
 
+GHOST_SPEED = 2
+
 class Sprite_Ghost(Sprite_ImageGridActor):
     def __init__(self, start_cell, cell0):
-        super().__init__("Ghost", start_cell, cell0)
+        super().__init__("Ghost", start_cell, cell0, GHOST_SPEED)
 
     def load_image(self):
         self.load_spritesheet("GhostR", "Images\\PacManGhost.png", 16, 4, start=0, end=1)
@@ -76,6 +79,76 @@ class PacMaze(StringLOL):
 
     def update_maze(self, maze_pos, maze_ch):
         self.update_lol(maze_pos[0], maze_pos[1], maze_ch)
+
+    def find_nearest_item_R(self, maze_name, col, row, item=True):
+        maze = self.mapped(maze_name)
+        found = False
+        xpos = col + 1
+        while not found:
+            found = (xpos >= self.cols)
+            if not found:
+                i = row * self.cols + xpos
+                if i>=0 and i<len(maze):
+                    found = (maze[i] == item)
+            if not found:
+                xpos = xpos + 1
+
+        return (xpos if found else -1)
+
+    def find_nearest_item_L(self, maze_name, col, row, item=True):
+        maze = self.mapped(maze_name)
+        found = False
+        xpos = col - 1
+        while not found:
+            found = (xpos < 0)
+            if not found:
+                i = row * self.cols + xpos
+                if i>=0 and i<len(maze):
+                    found = (maze[i] == item)
+            if not found:
+                xpos = xpos - 1
+
+        return (xpos if found else -1)
+
+    def find_nearest_item_D(self, maze_name, col, row, item=True):
+        maze = self.mapped(maze_name)
+        found = False
+        ypos = row + 1
+        while not found:
+            found = (ypos > self.rows)
+            if not found:
+                i = ypos * self.cols + col
+                if i>=0 and i<len(maze):
+                    found = (maze[i] == item)
+            if not found:
+                ypos = ypos + 1
+
+        return (ypos if found else -1)
+
+    def find_nearest_item_U(self, maze_name, col, row, item=True):
+        maze = self.mapped(maze_name)
+        found = False
+        ypos = row - 1
+        while not found:
+            found = (ypos < 0)
+            if not found:
+                i = ypos * self.cols + col
+                if i>=0 and i<len(maze):
+                    found = (maze[i] == item)
+            if not found:
+                ypos = ypos - 1
+
+        return (ypos if found else -1)
+
+    def find_nearest_item(self, maze_name, cell_pos, item=True):
+        col =  cell_pos[0]
+        row =  cell_pos[1]
+        return {
+            'R': self.find_nearest_item_R(maze_name, col, row),
+            'L': self.find_nearest_item_L(maze_name, col, row),
+            'D': self.find_nearest_item_D(maze_name, col, row),
+            'U': self.find_nearest_item_U(maze_name, col, row)
+        }
 
 ### --------------------------------------------------
 
@@ -133,7 +206,7 @@ class PacManager(SpriteManager):
     def update_pacman(self):
         # Move PacMan
         cell_pos = self._grid.find_cellp(self._pacman.centre)
-        barriers = self._grid.find_barriers(cell_pos)
+        barriers = self._maze.find_nearest_item("barrier", cell_pos)
         self._pacman.set_pos(cell_pos, barriers)
 
         if self._pacman.move(self._pacman_next_dir):
@@ -160,7 +233,7 @@ class PacManager(SpriteManager):
 
     def update_ghosts(self):
         cell_pos = self._grid.find_cellp(self._ghost.centre)
-        barriers = self._grid.find_barriers(cell_pos)
+        barriers = self._maze.find_nearest_item("barrier", cell_pos)
         self._ghost.set_pos(cell_pos, barriers)
         self._ghost.move()
 

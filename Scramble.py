@@ -1,46 +1,48 @@
 # To Do: Becasue of fastkeys, StartGame being sent multiple times
 
-import cProfile
-import pstats
-from pstats import SortKey
+# import cProfile
+# import pstats
+# from pstats import SortKey
 
-import sys
-sys.path.append("../pygame-cdkk")
-from cdkkPyGameApp import *
-from cdkkSpriteExtra import *
+# import sys
+# sys.path.append("pygame-cdkk")
+
+import cdkk
+import pygame
+import random
 
 ### --------------------------------------------------
 
 USE_PROFILING = False
 
 GAME_SPEED = 50    # msecs (lower=faster)
-EVENT_MOVE_ROCKET = EVENT_NEXT_USER_EVENT
+EVENT_MOVE_ROCKET = cdkk.EVENT_NEXT_USER_EVENT
 
 ### --------------------------------------------------
 
-class Sprite_Cave(Sprite_Shape):
+class Sprite_Cave(cdkk.Sprite_Shape):
     def __init__(self, cave_rect, min_gap, section_size=10):
-        super().__init__("Cave", cave_rect, Sprite_Shape.invisible_style)
+        super().__init__("Cave", cave_rect, cdkk.Sprite_Shape.invisible_style)
         self.cave_height = cave_rect.height
         self.cave_min_gap = min_gap
         self.cave_section_size = section_size
         self.cave_sections = (cave_rect.width // self.cave_section_size) + 1
         self.update_reqd = False
 
-        self.walls = Sprite_ShapeSetManager("Cave Shapes", cave_rect)
+        self.walls = cdkk.Sprite_ShapeSetManager("Cave Shapes", cave_rect)
 
         top_style = {"fillcolour":"blue", "outlinecolour":None, "shape":"Polygon"}
-        self.cave_top = Sprite_Shape("Cave Top", cave_rect, top_style)
+        self.cave_top = cdkk.Sprite_Shape("Cave Top", cave_rect, top_style)
         self.walls.add_shape(self.cave_top)
 
         bottom_style = {"fillcolour":"red3", "outlinecolour":None, "shape":"Polygon"}
-        self.cave_bottom = Sprite_Shape("Cave Bottom", cave_rect, bottom_style)
+        self.cave_bottom = cdkk.Sprite_Shape("Cave Bottom", cave_rect, bottom_style)
         self.walls.add_shape(self.cave_bottom)
 
     def start_game(self):
         super().start_game()
-        self.cave_top_queue = RandomQueue(self.cave_sections, 5, 500)
-        self.cave_bottom_queue = RandomQueue(self.cave_sections, 5, 500)
+        self.cave_top_queue = cdkk.RandomQueue(self.cave_sections, 5, 500)
+        self.cave_bottom_queue = cdkk.RandomQueue(self.cave_sections, 5, 500)
 
     def scroll(self):
         self.cave_top_queue.append(self.cave_height - self.cave_bottom_queue.next_value - self.cave_min_gap)
@@ -98,7 +100,7 @@ class Sprite_Cave(Sprite_Shape):
 
 ### --------------------------------------------------
 
-class Sprite_CaveItem(Sprite_Animation):
+class Sprite_CaveItem(cdkk.Sprite_Animation):
     def __init__(self, name):
         super().__init__(name)
         self.scroll_count = 0
@@ -107,8 +109,8 @@ class Sprite_CaveItem(Sprite_Animation):
     def setup(self, posx, posy, limits):
         self.rect.right = posx
         self.rect.bottom = posy - 1
-        ev = EventManager.gc_event("KillSpriteUUID", uuid=self.uuid, trace="CaveItem-Limit")
-        self.rect.add_limit(Physics_Limit(limits, LIMIT_KEEP_INSIDE, AT_LIMIT_XY_DO_NOTHING, ev))
+        ev = cdkk.EventManager.gc_event("KillSpriteUUID", uuid=self.uuid, trace="CaveItem-Limit")
+        self.rect.add_limit(cdkk.Physics_Limit(limits, cdkk.LIMIT_KEEP_INSIDE, cdkk.AT_LIMIT_XY_DO_NOTHING, ev))
 
     def scroll(self, dx):
         self.rect.move_physics(dx, 0)
@@ -123,8 +125,8 @@ class Sprite_CaveItem(Sprite_Animation):
 class Sprite_Rocket(Sprite_CaveItem):
     def __init__(self, posx, posy, limits):
         super().__init__("Rocket")
-        self.load_spritesheet("Rocket", "Images\\Rocket.png", 2, 1)
-        self.set_animation("Rocket", ANIMATE_LOOP)
+        self.load_spritesheet("Rocket", "Rocket.png", 2, 1)
+        self.set_animation("Rocket", cdkk.ANIMATE_LOOP)
         self.launch_at = random.randint(30,100)
         self.launch_speed = -random.randint(1,5)
         self.rect.set_velocity(0, 0)
@@ -145,35 +147,35 @@ class Sprite_Rocket(Sprite_CaveItem):
 class Sprite_FuelTank(Sprite_CaveItem):
     def __init__(self, posx, posy, limits):
         super().__init__("Fuel Tank")
-        self.load_spritesheet("Fuel Tank", "Images\\fuel_tank.png", 1, 1)
-        self.set_animation("Fuel Tank", ANIMATE_MANUAL)
+        self.load_spritesheet("Fuel Tank", "fuel_tank.png", 1, 1)
+        self.set_animation("Fuel Tank", cdkk.ANIMATE_MANUAL)
         self.setup(posx, posy, limits)
 
 ### --------------------------------------------------
 
-class Manager_Cave(SpriteManager):
+class Manager_Cave(cdkk.SpriteManager):
     def __init__(self, cave_rect, spaceship_height, name = "Cave Manager"):
         super().__init__(name)
         self._cave_rect = cave_rect
-        self.cave_background = Sprite_Shape("Cave background", cave_rect, style={"fillcolour":"green", "outlinecolour":None})
+        self.cave_background = cdkk.Sprite_Shape("Cave background", cave_rect, style={"fillcolour":"green", "outlinecolour":None})
         self.add(self.cave_background)
         self.cave = Sprite_Cave(cave_rect, spaceship_height*5)
         self.add(self.cave)
-        self.rockets = SpriteGroup()
+        self.rockets = cdkk.SpriteGroup()
         self.rocket_launch_at = random.randint(15, 30)
         self.rocket_loop = 0
-        self.fuel_tanks = SpriteGroup()
+        self.fuel_tanks = cdkk.SpriteGroup()
 
     def event(self, e):
         dealt_with = super().event(e)
-        if not dealt_with and e.type == EVENT_GAME_CONTROL:
+        if not dealt_with and e.type == cdkk.EVENT_GAME_CONTROL:
             if e.action == "ScrollGame":
                 if self.game_is_active:
                     self.cave.scroll()
                     self.move_cave_items()
                     self.add_rocket()
                     self.add_fuel_tank()
-                    EventManager.post_game_control("IncreaseScore", score=1)
+                    cdkk.EventManager.post_game_control("UpdateScore", score=1)
         return dealt_with
 
     def move_cave_items(self):
@@ -210,22 +212,22 @@ class Manager_Cave(SpriteManager):
 
 ### --------------------------------------------------
 
-class Sprite_Spaceship(Sprite_Animation):
+class Sprite_Spaceship(cdkk.Sprite_Animation):
     def __init__(self, limits):
         super().__init__("Spaceship")
         self._limits = limits
-        self.load_animation("Spaceship", "Images\\Spaceship{0:02d}.png", 7, crop=self.crop_image)
-        self.load_spritesheet("Explosion", "Images\\Explosion.png", 4, 4)
+        self.load_animation("Spaceship", "Spaceship{0:02d}.png", 7, crop=self.crop_image)
+        self.load_spritesheet("Explosion", "Explosion.png", 4, 4)
         self.show_spaceship()
         self.rect.centerx = limits.width/4
         self.rect.centery = limits.height/2
-        self.rect.add_limit(Physics_Limit(limits, LIMIT_KEEP_INSIDE, AT_LIMIT_X_HOLD_POS_X+AT_LIMIT_Y_HOLD_POS_Y))
+        self.rect.add_limit(cdkk.Physics_Limit(limits, cdkk.LIMIT_KEEP_INSIDE, cdkk.AT_LIMIT_X_HOLD_POS_X+cdkk.AT_LIMIT_Y_HOLD_POS_Y))
 
         return_speed = 3
-        limit_rect = cdkkRect(0,0,return_speed*2,0)
+        limit_rect = cdkk.cdkkRect(0,0,return_speed*2,0)
         limit_rect.center = self.rect.center
-        xlimit = Physics_Limit(limit_rect, LIMIT_MOVE_TO, AT_LIMIT_X_MOVE_TO_X)
-        xlimit.motion = Physics_Motion()
+        xlimit = cdkk.Physics_Limit(limit_rect, cdkk.LIMIT_MOVE_TO, cdkk.AT_LIMIT_X_MOVE_TO_X)
+        xlimit.motion = cdkk.Physics_Motion()
         xlimit.motion.velocity_x = return_speed
         self.rect.add_limit(xlimit)
         self.rect.go()
@@ -249,10 +251,10 @@ class Sprite_Spaceship(Sprite_Animation):
         self.rect.move_physics()
 
     def show_explosion(self):
-        self.set_animation("Explosion", ANIMATE_SHUTTLE_ONCE+ANIMATE_REVERSE, 1)
+        self.set_animation("Explosion", cdkk.ANIMATE_SHUTTLE_ONCE+cdkk.ANIMATE_REVERSE, 1)
 
     def show_spaceship(self):
-        self.set_animation("Spaceship", ANIMATE_LOOP)
+        self.set_animation("Spaceship", cdkk.ANIMATE_LOOP)
 
     def start_game(self):
         super().start_game()
@@ -262,10 +264,10 @@ class Sprite_Spaceship(Sprite_Animation):
 
 ### --------------------------------------------------
 
-class Sprite_Ammunition (Sprite_Shape):
+class Sprite_Ammunition (cdkk.Sprite_Shape):
     ammunition_style = {"fillcolour":"orange", "outlinecolour":None}
-    bullet_style = merge_dicts(ammunition_style, {"width":20, "height":3, "shape":"Rectangle"})
-    bomb_style = merge_dicts(ammunition_style, {"width":10, "height":10, "shape":"Ellipse"})
+    bullet_style = cdkk.merge_dicts(ammunition_style, {"width":20, "height":3, "shape":"Rectangle"})
+    bomb_style = cdkk.merge_dicts(ammunition_style, {"width":10, "height":10, "shape":"Ellipse"})
 
     def __init__(self, bullet_type, posx, posy, limits):
         super().__init__(bullet_type)
@@ -275,11 +277,11 @@ class Sprite_Ammunition (Sprite_Shape):
         elif bullet_type == "Bomb":
             self.update_style(Sprite_Ammunition.bomb_style)
             self.rect.set_velocity(5, 0)
-            self.rect.set_acceleration(0, Physics.gravity)
+            self.rect.set_acceleration(0, cdkk.Physics.gravity)
         self.rect.topleft = (posx, posy)
 
-        ev = EventManager.gc_event("KillSpriteUUID", uuid=self.uuid, trace="Bullet-Limit")
-        self.rect.add_limit(Physics_Limit(limits, LIMIT_KEEP_INSIDE, AT_LIMIT_XY_DO_NOTHING, ev))
+        ev = cdkk.EventManager.gc_event("KillSpriteUUID", uuid=self.uuid, trace="Bullet-Limit")
+        self.rect.add_limit(cdkk.Physics_Limit(limits, cdkk.LIMIT_KEEP_INSIDE, cdkk.AT_LIMIT_XY_DO_NOTHING, ev))
         self.rect.go()
 
     def update(self):
@@ -288,15 +290,15 @@ class Sprite_Ammunition (Sprite_Shape):
 
 ### --------------------------------------------------
 
-class Manager_Spaceship(SpriteManager):
+class Manager_Spaceship(cdkk.SpriteManager):
     def __init__(self, limits, name = "Spaceship Manager"):
         super().__init__(name)
         self._limits = limits
         self._spaceship = Sprite_Spaceship(self._limits)
         self.add(self._spaceship, layer=9)  # Layer 9: Above everything else
-        self._bullets = SpriteGroup()
+        self._bullets = cdkk.SpriteGroup()
         self._bullet_time_limit = 250  # Minimum time between bullets (msecs)
-        self._bullet_timer = Timer(self._bullet_time_limit/1000.0)
+        self._bullet_timer = cdkk.Timer(self._bullet_time_limit/1000.0)
 
     @property
     def spaceship_rect(self):
@@ -313,8 +315,8 @@ class Manager_Spaceship(SpriteManager):
             bullet = Sprite_Ammunition(bullet_type, posx, posy, self._limits)
             self.add(bullet, layer=1)
             self._bullets.add(bullet)
-            EventManager.post_game_control("IncreaseScore", score=-1)
-            self._bullet_timer = Timer(self._bullet_time_limit/1000.0)
+            cdkk.EventManager.post_game_control("UpdateScore", score=-1)
+            self._bullet_timer = cdkk.Timer(self._bullet_time_limit/1000.0)
 
     def spaceship_collide(self, *dangers):
         collide = False
@@ -322,7 +324,7 @@ class Manager_Spaceship(SpriteManager):
             if not collide:
                 collide = self._spaceship.collide(sprite_group)
         if collide:
-            EventManager.post_game_control("SpaceshipCrash")
+            cdkk.EventManager.post_game_control("SpaceshipCrash")
         return collide
 
     def bullets_collide(self, dangers, dokill, inc_score, inc_time):
@@ -330,15 +332,15 @@ class Manager_Spaceship(SpriteManager):
         if inc_score:
             for bullet, items in coll_dict.items():
                 if len(items) > 0:
-                    EventManager.post_game_control("IncreaseScore", score=len(items)*100)
+                    cdkk.EventManager.post_game_control("UpdateScore", score=len(items)*100)
         if inc_time:
             for bullet, items in coll_dict.items():
                 if len(items) > 0:
-                    EventManager.post_game_control("IncreaseTime", increment=10)
+                    cdkk.EventManager.post_game_control("IncreaseTime", increment=10)
 
     def event(self, e):
         dealt_with = super().event(e)
-        if not dealt_with and e.type == EVENT_GAME_CONTROL and self.game_is_active:
+        if not dealt_with and e.type == cdkk.EVENT_GAME_CONTROL and self.game_is_active:
             if e.action == "SpaceshipUp":
                 self._spaceship.rect.move_physics(0,-5)
                 dealt_with = True
@@ -353,7 +355,7 @@ class Manager_Spaceship(SpriteManager):
                 dealt_with = True
             elif e.action == "SpaceshipCrash":
                 self._spaceship.show_explosion()
-                EventManager.post_game_control("GameOver")
+                cdkk.EventManager.post_game_control("GameOver")
             elif e.action == "FireBullet":
                 self.fire_bullet("Bullet")
                 dealt_with = True
@@ -364,27 +366,27 @@ class Manager_Spaceship(SpriteManager):
 
 ### --------------------------------------------------
 
-class Manager_Scoreboard(SpriteManager):
+class Manager_Scoreboard(cdkk.SpriteManager):
     def __init__(self, game_time, limits, name = "Scoreboard Manager"):
         super().__init__(name)
         self._score = 0
         self._game_time = game_time
 
         score_style = {"fillcolour":None, "align_horiz":"L"}
-        self._scoreboard = Sprite_DynamicText("Score", cdkkRect(70, 10, 200, 40), score_style)
+        self._scoreboard = cdkk.Sprite_DynamicText("Score", cdkk.cdkkRect(70, 10, 200, 40), score_style)
         self._scoreboard.set_text_format("Score: {0}", 0)
         self.add(self._scoreboard)
 
         self._timer = None
-        self._time_left = Sprite_DynamicText("Time Left", cdkkRect(limits.width - 250, 10, 200, 40), score_style)
+        self._time_left = cdkk.Sprite_DynamicText("Time Left", cdkk.cdkkRect(limits.width - 250, 10, 200, 40), score_style)
         self._time_left.set_text_format("Time Left: {0:0.1f}", 0)
         self.add(self._time_left)
 
-        self._fps = Sprite_DynamicText("FPS", cdkkRect(limits.centerx-100, 10, 200, 40), score_style)
+        self._fps = cdkk.Sprite_DynamicText("FPS", cdkk.cdkkRect(limits.centerx-100, 10, 200, 40), score_style)
         self._fps.set_text_format("FPS: {0:4.1f}", 0)
         self.add(self._fps)
 
-        self._game_over = Sprite_GameOver(limits)
+        self._game_over = cdkk.Sprite_GameOver(limits)
 
     @property
     def score(self):
@@ -400,8 +402,8 @@ class Manager_Scoreboard(SpriteManager):
 
     def event(self, e):
         dealt_with = super().event(e)
-        if not dealt_with and e.type == EVENT_GAME_CONTROL:
-            if e.action == "IncreaseScore":
+        if not dealt_with and e.type == cdkk.EVENT_GAME_CONTROL:
+            if e.action == "UpdateScore":
                 self.score = self.score + e.info['score']
                 dealt_with = True
             elif e.action == "IncreaseTime":
@@ -416,7 +418,7 @@ class Manager_Scoreboard(SpriteManager):
     def start_game(self):
         super().start_game()
         self.score = 0
-        self._timer = Timer(self._game_time, EVENT_GAME_TIMER_1, auto_start=True)
+        self._timer = cdkk.Timer(self._game_time, cdkk.EVENT_GAME_TIMER_1, auto_start=True)
         self.remove(self._game_over)
 
     def end_game(self):
@@ -427,7 +429,7 @@ class Manager_Scoreboard(SpriteManager):
 
 ### --------------------------------------------------
 
-class ScrambleApp(PyGameApp):
+class ScrambleApp(cdkk.PyGameApp):
     def init(self):
         super().init()
 
@@ -454,7 +456,7 @@ class ScrambleApp(PyGameApp):
             pygame.K_z    : "FireBomb"
         }
         user_event_map = {
-            EVENT_GAME_TIMER_1 : "GameOver"
+            cdkk.EVENT_GAME_TIMER_1 : "GameOver"
         }
         self.event_mgr.event_map(key_event_map=key_map, user_event_map=user_event_map)
 
@@ -464,7 +466,7 @@ class ScrambleApp(PyGameApp):
         self.spaceship_mgr.bullets_collide(self.cave_mgr.cave.walls, dokill=False, inc_score=False, inc_time=False)
         self.spaceship_mgr.bullets_collide(self.cave_mgr.rockets, dokill=True, inc_score=True, inc_time=False)
         self.spaceship_mgr.bullets_collide(self.cave_mgr.fuel_tanks, dokill=True, inc_score=False, inc_time=True)
-        self.scoreboard_mgr.set_fps(theApp.loops_per_sec)
+        self.scoreboard_mgr.set_fps(self.loops_per_sec)
 
 ### --------------------------------------------------
 
@@ -473,22 +475,23 @@ app_config = {
     "background_fill":"burlywood",
     "caption":"Scramble",
     "key_repeat_time":30,   # msecs (lower=faster)
-    "scroll_time":50        # msecs (lower=faster)
+    "scroll_time":50,       # msecs (lower=faster)
+    "image_path":"ArcadeGames\\Images\\"
     }
-theApp = ScrambleApp(app_config)
+ScrambleApp(app_config).execute()
 
-if not USE_PROFILING:
-    theApp.execute()
-else:
-    cProfile.run('theApp.execute()', 'scramble_stats.log')
-    p = pstats.Stats('scramble_stats.log')
-    print("Sort by internal time: (exc sub-functions)")
-    print("----------------------")
-    p.strip_dirs().sort_stats(SortKey.TIME).print_stats(20)
-    p.strip_dirs().sort_stats(SortKey.TIME).print_callers('blit')
+# if not USE_PROFILING:
+#     theApp.execute()
+# else:
+#     cProfile.run('theApp.execute()', 'scramble_stats.log')
+#     p = pstats.Stats('scramble_stats.log')
+#     print("Sort by internal time: (exc sub-functions)")
+#     print("----------------------")
+#     p.strip_dirs().sort_stats(SortKey.TIME).print_stats(20)
+#     p.strip_dirs().sort_stats(SortKey.TIME).print_callers('blit')
 
-    # print("Sort by cumulative time: (inc sub-functions)")
-    # p.strip_dirs().sort_stats(SortKey.CUMULATIVE).print_stats(20)
+#     # print("Sort by cumulative time: (inc sub-functions)")
+#     # p.strip_dirs().sort_stats(SortKey.CUMULATIVE).print_stats(20)
 
-    # print("Sort by call count:")
-    # p.strip_dirs().sort_stats(SortKey.CALLS).print_stats(20)
+#     # print("Sort by call count:")
+#     # p.strip_dirs().sort_stats(SortKey.CALLS).print_stats(20)

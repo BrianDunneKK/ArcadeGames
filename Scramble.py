@@ -1,11 +1,9 @@
 # To Do: Becasue of fastkeys, StartGame being sent multiple times
+# To DO: Is hitting fuel generating multiple IncreaneTime events?
 
 # import cProfile
 # import pstats
 # from pstats import SortKey
-
-# import sys
-# sys.path.append("pygame-cdkk")
 
 import cdkk
 import pygame
@@ -22,22 +20,22 @@ EVENT_MOVE_ROCKET = cdkk.EVENT_NEXT_USER_EVENT
 
 class Sprite_Cave(cdkk.Sprite_Shape):
     def __init__(self, cave_rect, min_gap, section_size=10):
-        super().__init__("Cave", cave_rect, cdkk.Sprite_Shape.invisible_style)
+        super().__init__("Cave", cave_rect, cdkk.stylesheet.style("Invisible"))
         self.cave_height = cave_rect.height
         self.cave_min_gap = min_gap
         self.cave_section_size = section_size
         self.cave_sections = (cave_rect.width // self.cave_section_size) + 1
         self.update_reqd = False
 
-        self.walls = cdkk.Sprite_ShapeSetManager("Cave Shapes", cave_rect)
+        self.walls = cdkk.SpriteGroup("Cave Shapes")
 
         top_style = {"fillcolour":"blue", "outlinecolour":None, "shape":"Polygon"}
         self.cave_top = cdkk.Sprite_Shape("Cave Top", cave_rect, top_style)
-        self.walls.add_shape(self.cave_top)
+        self.walls.add(self.cave_top)
 
         bottom_style = {"fillcolour":"red3", "outlinecolour":None, "shape":"Polygon"}
         self.cave_bottom = cdkk.Sprite_Shape("Cave Bottom", cave_rect, bottom_style)
-        self.walls.add_shape(self.cave_bottom)
+        self.walls.add(self.cave_bottom)
 
     def start_game(self):
         super().start_game()
@@ -77,7 +75,7 @@ class Sprite_Cave(cdkk.Sprite_Shape):
     def draw(self):
         self.create_canvas()
         super().draw()
-        self.walls.draw_shapes(self.image)
+        self.walls.draw_sprites(self.image)
 
     def cave_top_bottom(self, posx, rel_screen=True):
         if rel_screen:
@@ -161,10 +159,10 @@ class Manager_Cave(cdkk.SpriteManager):
         self.add(self.cave_background)
         self.cave = Sprite_Cave(cave_rect, spaceship_height*5)
         self.add(self.cave)
-        self.rockets = cdkk.SpriteGroup()
+        self.rockets = cdkk.SpriteGroup("Rockets")
         self.rocket_launch_at = random.randint(15, 30)
         self.rocket_loop = 0
-        self.fuel_tanks = cdkk.SpriteGroup()
+        self.fuel_tanks = cdkk.SpriteGroup("Fuel Tanks")
 
     def event(self, e):
         dealt_with = super().event(e)
@@ -296,7 +294,7 @@ class Manager_Spaceship(cdkk.SpriteManager):
         self._limits = limits
         self._spaceship = Sprite_Spaceship(self._limits)
         self.add(self._spaceship, layer=9)  # Layer 9: Above everything else
-        self._bullets = cdkk.SpriteGroup()
+        self._bullets = cdkk.SpriteGroup("Bullets")
         self._bullet_time_limit = 250  # Minimum time between bullets (msecs)
         self._bullet_timer = cdkk.Timer(self._bullet_time_limit/1000.0)
 
@@ -336,7 +334,7 @@ class Manager_Spaceship(cdkk.SpriteManager):
         if inc_time:
             for bullet, items in coll_dict.items():
                 if len(items) > 0:
-                    cdkk.EventManager.post_game_control("IncreaseTime", increment=10)
+                    cdkk.EventManager.post_game_control("IncreaseTime", increment=5)
 
     def event(self, e):
         dealt_with = super().event(e)

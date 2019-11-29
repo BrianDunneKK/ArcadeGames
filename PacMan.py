@@ -1,9 +1,6 @@
 # To Do: Create PacManLevel.add_event()
 # To Do: In choose_move(), (self.since_last_choice < delay) needs to validate choice
 
-# import sys
-# sys.path.append("pygame-cdkk")
-
 import cdkk
 import pygame
 import random

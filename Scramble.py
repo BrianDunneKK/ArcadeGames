@@ -1,10 +1,13 @@
 # To Do: Becasue of fastkeys, StartGame being sent multiple times
-# To DO: Is hitting fuel generating multiple IncreaneTime events?
+# To DO: Is hitting fuel generating multiple IncreaseTime events?
+# To Do: Change spaceship from frames to spritesheet
 
 # import cProfile
 # import pstats
 # from pstats import SortKey
 
+import sys
+sys.path.insert(0, "cdkk")
 import cdkk
 import pygame
 import random
@@ -102,7 +105,7 @@ class Sprite_CaveItem(cdkk.Sprite_Animation):
     def __init__(self, name):
         super().__init__(name)
         self.scroll_count = 0
-        self.set_desc("Cave Item", True)
+        self.set_config("Cave Item", True)
 
     def setup(self, posx, posy, limits):
         self.rect.right = posx
@@ -130,10 +133,7 @@ class Sprite_Rocket(Sprite_CaveItem):
         self.rect.set_velocity(0, 0)
         self.setup(posx, posy, limits)
         self.rect.go()
-
-    def update(self):
-        super().update()
-        self.rect.move_physics()
+        self.set_config("auto_move_physics", True)
 
     def scroll(self, dx):
         super().scroll(dx)
@@ -229,6 +229,7 @@ class Sprite_Spaceship(cdkk.Sprite_Animation):
         xlimit.motion.velocity_x = return_speed
         self.rect.add_limit(xlimit)
         self.rect.go()
+        self.set_config("auto_move_physics", True)
 
     @property
     def crop_image(self):
@@ -243,10 +244,6 @@ class Sprite_Spaceship(cdkk.Sprite_Animation):
         corners.append((self.rect.left+34, self.rect.bottom))
         corners.append((self.rect.right, self.rect.centery+5))
         return corners
-
-    def update(self):
-        super().update()
-        self.rect.move_physics()
 
     def show_explosion(self):
         self.set_animation("Explosion", cdkk.ANIMATE_SHUTTLE_ONCE+cdkk.ANIMATE_REVERSE, 1)
@@ -281,10 +278,7 @@ class Sprite_Ammunition (cdkk.Sprite_Shape):
         ev = cdkk.EventManager.gc_event("KillSpriteUUID", uuid=self.uuid, trace="Bullet-Limit")
         self.rect.add_limit(cdkk.Physics_Limit(limits, cdkk.LIMIT_KEEP_INSIDE, cdkk.AT_LIMIT_XY_DO_NOTHING, ev))
         self.rect.go()
-
-    def update(self):
-        super().update()
-        self.rect.move_physics()
+        self.set_config("auto_move_physics", True)
 
 ### --------------------------------------------------
 

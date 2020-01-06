@@ -1,4 +1,4 @@
-# To Do: Becasue of fastkeys, StartGame being sent multiple times
+# To Do: Because of fastkeys, StartGame being sent multiple times
 # To DO: Is hitting fuel generating multiple IncreaseTime events?
 # To Do: Change spaceship from frames to spritesheet
 
@@ -6,8 +6,8 @@
 # import pstats
 # from pstats import SortKey
 
-import sys
-sys.path.insert(0, "cdkk")
+# import sys
+# sys.path.insert(0, "cdkk")
 import cdkk
 import pygame
 import random
@@ -333,16 +333,16 @@ class Manager_Spaceship(cdkk.SpriteManager):
     def event(self, e):
         dealt_with = super().event(e)
         if not dealt_with and e.type == cdkk.EVENT_GAME_CONTROL and self.game_is_active:
-            if e.action == "SpaceshipUp":
+            if e.action == "MoveUp":
                 self._spaceship.rect.move_physics(0,-5)
                 dealt_with = True
-            elif e.action == "SpaceshipDown":
+            elif e.action == "MoveDown":
                 self._spaceship.rect.move_physics(0,5)
                 dealt_with = True
-            elif e.action == "SpaceshipLeft":
+            elif e.action == "MoveLeft":
                 self._spaceship.rect.move_physics(-10,0)
                 dealt_with = True
-            elif e.action == "SpaceshipRight":
+            elif e.action == "MoveRight":
                 self._spaceship.rect.move_physics(10,0)
                 dealt_with = True
             elif e.action == "SpaceshipCrash":
@@ -358,66 +358,9 @@ class Manager_Spaceship(cdkk.SpriteManager):
 
 ### --------------------------------------------------
 
-class Manager_Scoreboard(cdkk.SpriteManager):
-    def __init__(self, game_time, limits, name = "Scoreboard Manager"):
-        super().__init__(name)
-        self._score = 0
-        self._game_time = game_time
-
-        score_style = {"fillcolour":None, "align_horiz":"L"}
-        self._scoreboard = cdkk.Sprite_DynamicText("Score", cdkk.cdkkRect(70, 10, 200, 40), score_style)
-        self._scoreboard.set_text_format("Score: {0}", 0)
-        self.add(self._scoreboard)
-
-        self._timer = None
-        self._time_left = cdkk.Sprite_DynamicText("Time Left", cdkk.cdkkRect(limits.width - 250, 10, 200, 40), score_style)
-        self._time_left.set_text_format("Time Left: {0:0.1f}", 0)
-        self.add(self._time_left)
-
-        self._fps = cdkk.Sprite_DynamicText("FPS", cdkk.cdkkRect(limits.centerx-100, 10, 200, 40), score_style)
-        self._fps.set_text_format("FPS: {0:4.1f}", 0)
-        self.add(self._fps)
-
-        self._game_over = cdkk.Sprite_GameOver(limits)
-
-    @property
-    def score(self):
-        return self._score
-
-    @score.setter
-    def score(self, new_score):
-        self._score = new_score
-        self._scoreboard.set_text(self.score)
-
-    def set_fps(self, new_fps):
-        self._fps.set_text(new_fps)
-
-    def event(self, e):
-        dealt_with = super().event(e)
-        if not dealt_with and e.type == cdkk.EVENT_GAME_CONTROL:
-            if e.action == "UpdateScore":
-                self.score = self.score + e.info['score']
-                dealt_with = True
-            elif e.action == "IncreaseTime":
-                self._timer.extend_timer(e.info["increment"])
-                dealt_with = True
-        return dealt_with
-
-    def slow_update(self):
-        if self.game_is_active:
-            self._time_left.set_text(self._timer.time_left)
-            
-    def start_game(self):
-        super().start_game()
-        self.score = 0
-        self._timer = cdkk.Timer(self._game_time, cdkk.EVENT_GAME_TIMER_1, auto_start=True)
-        self.remove(self._game_over)
-
-    def end_game(self):
-        self.add(self._game_over)
-        if self._timer.time_left < 0.25:
-            self._time_left.set_text(0)
-        super().end_game()
+class Manager_Scoreboard(cdkk.SM_Scoreboard):
+    def __init__(self, game_time):
+        super().__init__(game_time, fps_style={"invisible": False})       
 
 ### --------------------------------------------------
 
@@ -430,23 +373,15 @@ class ScrambleApp(cdkk.PyGameApp):
 
         self.spaceship_mgr = Manager_Spaceship(cave_rect)
         self.cave_mgr = Manager_Cave(cave_rect, self.spaceship_mgr.spaceship_rect.height)
-        self.scoreboard_mgr = Manager_Scoreboard(10, self.boundary)
+        self.scoreboard_mgr = Manager_Scoreboard(10)
 
         # Sequence: Bottom to top layer
         self.add_sprite_mgr(self.cave_mgr)
         self.add_sprite_mgr(self.spaceship_mgr)
         self.add_sprite_mgr(self.scoreboard_mgr)
 
-        key_map = {
-            pygame.K_q    : "Quit",
-            pygame.K_r    : "StartGame",
-            pygame.K_UP   : "SpaceshipUp",
-            pygame.K_DOWN : "SpaceshipDown",
-            pygame.K_LEFT : "SpaceshipLeft",
-            pygame.K_RIGHT: "SpaceshipRight",
-            pygame.K_a    : "FireBullet",
-            pygame.K_z    : "FireBomb"
-        }
+        key_map = cdkk.merge_dicts(cdkk.PyGameApp.default_key_map,
+                                   {pygame.K_a: "FireBullet", pygame.K_z: "FireBomb"})
         user_event_map = {
             cdkk.EVENT_GAME_TIMER_1 : "GameOver"
         }

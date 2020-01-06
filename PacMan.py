@@ -1,8 +1,9 @@
 # To Do: Create PacManLevel.add_event()
 # To Do: In choose_move(), (self.since_last_choice < delay) needs to validate choice
+# To Do: Scale PacMan Grid to suit screen size
 
-import sys
-sys.path.insert(0, "cdkk")
+# import sys
+# sys.path.insert(0, "cdkk")
 import cdkk
 import pygame
 import random
@@ -133,8 +134,8 @@ class PacManager(cdkk.SpriteManager):
             if e.action == "PacManJump":
                 self._pacman.move_to(e.info["toCell"])
                 dealt_with = True
-            elif e.action in ["PacManUp", "PacManDown", "PacManLeft", "PacManRight"]:
-                self._pacman.next_dir = e.action[6:7]  # U, D, L or R
+            elif e.action in ["MoveUp", "MoveDown", "MoveLeft", "MoveRight"]:
+                self._pacman.next_dir = e.action[4:5]  # U, D, L or R
                 dealt_with = True
         return dealt_with
 
@@ -178,65 +179,19 @@ class PacManager(cdkk.SpriteManager):
 
 ### --------------------------------------------------
 
-class Manager_Scoreboard(cdkk.SpriteManager):
-    def __init__(self, game_time, limits):
-        super().__init__("Scoreboard Manager")
-        score_style = {"textcolour":"white", "fillcolour":None, "align_horiz":"L"}
-
-        self._game_time = game_time
-        self._timer = None
-        self._time_left = cdkk.Sprite_DynamicText("Time Left", cdkk.cdkkRect(10, 10, 200, 40), score_style)
-        self._time_left.set_text_format("Time Left: {0:0.1f}", 0)
-        self.add(self._time_left)
-
-        self._fps = cdkk.Sprite_DynamicText("FPS", cdkk.cdkkRect(10, 60, 200, 40), score_style)
-        self._fps.set_text_format("FPS: {0:4.1f}", 0)
-        self.add(self._fps)
-
-        self._score = 0
-        self._scoreboard = cdkk.Sprite_DynamicText("Score", cdkk.cdkkRect(10, 110, 200, 40), score_style)
-        self._scoreboard.set_text_format("Score: {0}", 0)
-        self.add(self._scoreboard)
-
-        self._game_over = cdkk.Sprite_GameOver(limits)
-
-    @property
-    def score(self):
-        return self._score
-
-    @score.setter
-    def score(self, new_score):
-        self._score = new_score
-        self._scoreboard.set_text(self.score)
-
-    def set_fps(self, new_fps):
-        self._fps.set_text(new_fps)
-
-    def slow_update(self):
-        if self.game_is_active:
-            self._time_left.set_text(self._timer.time_left)
-            
-    def start_game(self):
-        super().start_game()
-        self._timer = cdkk.Timer(self._game_time, cdkk.EVENT_GAME_TIMER_1, auto_start=True)
-        self.remove(self._game_over)
+class Manager_Scoreboard(cdkk.SM_Scoreboard):
+    def __init__(self, game_time):
+        score_style = {"xpos":10, "ypos":10, "textcolour":"white", "textsize":28}
+        timer_style = cdkk.merge_dicts(score_style, {"ypos": 40})
+        fps_style = cdkk.merge_dicts(score_style, {"ypos":70, "invisible": False})
+        super().__init__(game_time, score_style=score_style, timer_style=timer_style, fps_style=fps_style)
 
     def end_game(self):
         if self._timer.time_up():
-            self._game_over.text = "You Lost"
+            self.game_over.text = "You Lost"
         else:
-            self._game_over.text = "You Won!!"
-
-        self.add(self._game_over)
+            self.game_over.text = "You Won!!"
         super().end_game()
-
-    def event(self, e):
-        dealt_with = super().event(e)
-        if not dealt_with and e.type == cdkk.EVENT_GAME_CONTROL:
-            if e.action == "UpdateScore":
-                self.score = self.score + e.info['score']
-                dealt_with = True
-        return dealt_with
 
 ### --------------------------------------------------
 
@@ -299,24 +254,16 @@ class PacManGame(cdkk.PyGameApp):
         pacmanLevel1.maze.add_map("barrier", barrierMap)
         pacmanLevel1.maze.add_map("pacdot", pacdotMap, False)
         
-        self.pacmanager = PacManager(pacmanLevel1, self.boundary)
-        self.scoreboard_mgr = Manager_Scoreboard(90, self.boundary)
+        self.pacmanager = PacManager(pacmanLevel1, self.boundary.move(50,0))
+        self.scoreboard_mgr = Manager_Scoreboard(game_time=90)
 
         self.add_sprite_mgr(self.pacmanager)
         self.add_sprite_mgr(self.scoreboard_mgr)
 
-        key_map = {
-            pygame.K_q : "Quit",
-            pygame.K_s : "StartGame",
-            pygame.K_UP : "PacManUp",
-            pygame.K_DOWN : "PacManDown",
-            pygame.K_LEFT : "PacManLeft",
-            pygame.K_RIGHT : "PacManRight",
-        }
         user_event_map = {
             cdkk.EVENT_GAME_TIMER_1 : "GameOver"
         }
-        self.event_mgr.event_map(key_event_map=key_map, user_event_map=user_event_map)
+        self.event_mgr.event_map(key_event_map=cdkk.PyGameApp.default_key_map, user_event_map=user_event_map)
 
     def update(self):
         super().update()
@@ -333,4 +280,3 @@ app_config = {
     "image_path":"ArcadeGames\\Images\\"
     }
 PacManGame(app_config).execute()
-

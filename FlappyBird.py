@@ -1,10 +1,8 @@
-# To Do: Add Manager_Scoreboard to cdkkSpriteExtra
-
-import sys
-sys.path.insert(0, "cdkk")
-import random
-import cdkk
+# import sys
+# sys.path.insert(0, "cdkk")
 import pygame
+import cdkk
+import random
 
 sprite_extra_styles = {
     "Scoreboard": {"fillcolour": None, "outlinecolour": None, "textsize": 36, "align_horiz": "L"}
@@ -119,7 +117,7 @@ class Manager_FlappyBird(cdkk.SpriteManager):
         super().update()
         collide = self._bird.collide(self.find_sprites_by_desc("Type", "Pipe"))
         if collide:
-            cdkk.EventManager.post_game_control("CollidePipe")
+            cdkk.EventManager.post_game_control("GameOver")
 
         for s in self.find_sprites_by_name("PipeTop"):
             if s.rect.right < self._bird.rect.left:
@@ -131,60 +129,15 @@ class Manager_FlappyBird(cdkk.SpriteManager):
 # --------------------------------------------------
 
 
-class Manager_Scoreboard(cdkk.SpriteManager):
-    def __init__(self, game_time, limits):
-        super().__init__("Scoreboard Manager")
-
-        sb_rect = cdkk.cdkkRect(limits.right-200, 10, 200, 40)
-
-        self._game_time = game_time
-        self._timer = cdkk.Timer(
-            self._game_time, cdkk.EVENT_GAME_TIMER_1, auto_start=False)
-
-        self._time_left = cdkk.Sprite_TextBox("Time Left", sb_rect,
-                                              cdkk.stylesheet.style("Scoreboard"))
-        self._time_left.set_text_format("Time Left: {0:0.1f}", 0)
-        self.add(self._time_left)
-
-        self._score = 0
-        self._game_score = cdkk.Sprite_TextBox("Score", sb_rect.move(0, 40),
-                                               cdkk.stylesheet.style("Scoreboard"))
-        self._game_score.set_text_format("Score: {0:d}", 0)
-        self.add(self._game_score)
-
-        self._game_over = cdkk.Sprite_GameOver(limits)
-
-    def set_fps(self, new_fps):
-        self._fps.set_text(new_fps)
-
-    def slow_update(self):
-        if self.game_is_active:
-            self._time_left.set_text(self._timer.time_left)
-
-    def start_game(self):
-        super().start_game()
-        self._score = 0
-        self._timer.start()
-        self.remove(self._game_over)
-        self._game_over.text = "Game Over"
-
-    def end_game(self):
-        self.add(self._game_over)
-        self.slow_update()
-        super().end_game()
-
-    def event(self, e):
-        dealt_with = super().event(e)
-        if not dealt_with and e.type == cdkk.EVENT_GAME_CONTROL:
-            if e.action == "UpdateScore":
-                self._score = self._score + e.info['score']
-                self._game_score.set_text(self._score)
-                dealt_with = True
-            elif e.action == "CollidePipe":
-                dealt_with = True
-                self._game_over.text = "You hit a pipe!"
-                cdkk.EventManager.post_game_control("GameOver")
-        return dealt_with
+class Manager_Scoreboard(cdkk.SM_Scoreboard):
+    def __init__(self, game_time):
+        score_style = cdkk.stylesheet.style("Scoreboard")
+        timer_style = cdkk.stylesheet.style("Scoreboard")
+        super().__init__(game_time, score_style=score_style, timer_style=timer_style)
+        sb_rect = cdkk.cdkkRect(self.app_boundary.right-200, 10, 200, 40)
+        self.timer_text.rect = sb_rect
+        self.score_text.rect = sb_rect.move(0, 40)
+        self.game_over.text = "You hit a pipe!"
 
 # --------------------------------------------------
 
@@ -194,17 +147,13 @@ class FlappyBirdGame(cdkk.PyGameApp):
         super().init()
 
         self.bird_mgr = Manager_FlappyBird(self.boundary, 10, 2, 5)
-        self.scoreboard_mgr = Manager_Scoreboard(10, self.boundary)
+        self.scoreboard_mgr = Manager_Scoreboard(10)
 
         self.add_sprite_mgr(self.bird_mgr)
         self.add_sprite_mgr(self.scoreboard_mgr)
 
-        key_map = {
-            pygame.K_q: "Quit",
-            pygame.K_s: "StartGame",
-            pygame.K_e: "GameOver",
-            pygame.K_SPACE: "Flap"
-        }
+        key_map = cdkk.merge_dicts(cdkk.PyGameApp.default_key_map,
+                                   {pygame.K_SPACE: "Flap"})
         user_event_map = {
             cdkk.EVENT_GAME_TIMER_1: "GameOver",
             cdkk.EVENT_GAME_TIMER_2: "AddPipe"
